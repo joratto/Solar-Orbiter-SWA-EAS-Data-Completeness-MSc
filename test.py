@@ -2,6 +2,7 @@ import sys
 print(sys.executable)
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 import os
 os.environ["CDF_LIB"] = "C:\\Program Files\\CDF_Distribution"
 from spacepy import pycdf
@@ -23,6 +24,8 @@ B_rtn = np.array(cdf['B_RTN'])
 Bx, By, Bz = B_rtn.T
 
 t = np.array(cdf['EPOCH'])
+
+sns.set_theme(style='ticks')
 
 plt.subplot(111)
 
