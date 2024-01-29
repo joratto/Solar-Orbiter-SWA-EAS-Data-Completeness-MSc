@@ -16,12 +16,12 @@ import numpy as np
 
 cdf_path = 'data\solo_L2_mag-rtn-normal-1-minute_20231031_V01.cdf'
 cdf = pycdf.CDF(cdf_path)
-print(len(cdf['VECTOR_TIME_RESOLUTION']))
-print(cdf['VECTOR_TIME_RESOLUTION'][0])
-print(cdf['EPOCH'][1])
+#print(len(cdf['VECTOR_TIME_RESOLUTION']))
+#print(cdf['VECTOR_TIME_RESOLUTION'][0])
+#print(cdf['EPOCH'][1])
 B_rtn = np.array(cdf['B_RTN'])
 
-Bx, By, Bz = B_rtn.T
+Br, Bt, Bn = B_rtn.T
 
 t = np.array(cdf['EPOCH'])
 
@@ -29,9 +29,9 @@ sns.set_theme(style='ticks')
 
 plt.subplot(111)
 
-plt.plot(t,Bx)
-plt.plot(t,By)
-plt.plot(t,Bz)
+plt.plot(t,Br)
+plt.plot(t,Bt)
+plt.plot(t,Bn)
 plt.ylabel('B (nT)')
 plt.xlabel('Date & Time (MM-DD HH)')
 plt.legend(["Radial", "Tangent", "Normal"])
