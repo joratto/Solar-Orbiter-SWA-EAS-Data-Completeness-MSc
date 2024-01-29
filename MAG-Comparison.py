@@ -10,7 +10,7 @@ cdf_filename_eas = 'solo_L1_swa-eas-padc_20230831T172734-20230831T173233_V01.cdf
 cdf_eas = pycdf.CDF('data\\' + cdf_filename_eas)
 #print(cdf_eas)
 #print(cdf_eas['SWA_EAS_MagDataUsed'][:])
-time_eas = cdf_eas['EPOCH']
+time_eas = np.array(cdf_eas['EPOCH'])
 t0 = time_eas[0] # start of timeframe
 tf = time_eas[-1] # end of timeframe
 print('EAS time series from {} to {}'.format(t0, tf))
@@ -20,7 +20,7 @@ print('EAS time series from {} to {}'.format(t0, tf))
 cdf_filename_mag = 'solo_L2_mag-srf-normal_20230831_V01.cdf'
 cdf_mag = pycdf.CDF('data\\' + cdf_filename_mag)
 #print(cdf_mag)
-time_mag = cdf_mag['EPOCH'][500000:]
+time_mag = np.array(cdf_mag['EPOCH'][500000:])
 
 length = len(time_mag)
 
@@ -54,14 +54,29 @@ for i in range(len(B_mag)):
 Bx_mag, By_mag, Bz_mag = np.array(B_mag).T
 Bx_eas, By_eas, Bz_eas = np.array(B_eas).T
 
-plt.plot(time_mag,Bx_mag)
-plt.plot(time_eas,Bx_eas)
-plt.ylabel('B (normalised)')
-plt.xlabel('Date & Time (dd hh:mm)')
-plt.legend(["Bx MAG", "Bx EAS"])
-plt.grid()
-plt.title('{} & {}'.format(cdf_filename_eas, cdf_filename_mag))
 sns.set_theme(style='ticks')
+fig, axs = plt.subplots(3)
+
+axs[0].plot(time_mag,Bx_mag)
+axs[0].plot(time_eas,Bx_eas)
+axs[0].set_ylabel('Bx (normalised)')
+#axs[0].set_xlabel('Date & Time (dd hh:mm)')
+axs[0].legend(["Bx MAG", "Bx EAS"])
+axs[0].grid()
+axs[0].set_title('{}    &    {}'.format(cdf_filename_eas, cdf_filename_mag))
+
+axs[1].plot(time_mag,By_mag)
+axs[1].plot(time_eas,By_eas)
+axs[1].set_ylabel('By (normalised)')
+axs[1].legend(["By MAG", "By EAS"])
+axs[1].grid()
+
+axs[2].plot(time_mag,Bz_mag)
+axs[2].plot(time_eas,Bz_eas)
+axs[2].set_ylabel('Bz (normalised)')
+axs[2].legend(["Bz MAG", "Bz EAS"])
+axs[2].grid()
+axs[2].set_xlabel('Date & Time (dd hh:mm)')
 
 # quick calculation of the angle difference between B vectors
 print('{} degrees'.format(180*(np.arctan(Bz_mag[0]/Bx_mag[0])/90/np.pi - np.arctan(Bz_eas[0]/Bx_eas[0])/np.pi)))
