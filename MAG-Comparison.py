@@ -32,19 +32,23 @@ def cropTimeToRef(seriesaxis,timeaxis,reftimeaxis,searchdivisions=5):
     if length != len(seriesaxis):
         raise Exception('time and series axes must be the same size!')
     if len(reftimeaxis) > length:
-        raise Exception('reference axis must be shorter than the axis to be cropped!')
+        raise Exception('reference timeframe must be shorter than the timeframe to be cropped!')
     
     print('\n')
     time_index_t0 = 0
     for i in range(1,searchdivisions+1):
         time_index_t0 += int(length/2**i)*(timeaxis[time_index_t0+int(length/2**i)] < t0) # add smaller and smaller slices to converge on the right time_mag index for t0
     while timeaxis[time_index_t0] < t0:
+        if time_index_t0 >= length:
+            raise Exception('reference timeframe not contained within the timeframe to be cropped!')
         time_index_t0 += 1
         print('\rt0 index = {}/{}'.format(time_index_t0,length), end='')
         continue
     print('\n')
     time_index_tf = time_index_t0
     while timeaxis[time_index_tf] < tf:
+        if time_index_tf >= length:
+            break # because the time axis to be cropped ends too early
         time_index_tf += 1
         print('\rtf index = {}/{}'.format(time_index_tf,length), end='')
         continue
