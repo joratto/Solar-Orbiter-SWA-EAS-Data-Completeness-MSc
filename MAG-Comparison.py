@@ -18,30 +18,46 @@ cdf_filename_mag = 'solo_L2_mag-srf-normal_20230831_V01.cdf'
 cdf_mag = pycdf.CDF('data\\' + cdf_filename_mag)
 time_mag = cdf_mag['EPOCH']#[500000:])
 
-# The following code block finds where to crop time_mag and
-# B_mag to match time_eas and B_eas (can be more efficient).
-print('\n')
-length = len(time_mag)
-time_mag_index_t0 = 0
-for i in range(1,5):
-    time_mag_index_t0 += int(length/2**i)*(time_mag[time_mag_index_t0+int(length/2**i)] < t0) # add smaller and smaller slices to converge on the right time_mag index for t0
-while time_mag[time_mag_index_t0] < t0:
-    time_mag_index_t0 += 1
-    print('\rt0 MAG index = {}/{}'.format(time_mag_index_t0,length), end='')
-    continue
-print('\n')
-time_mag_index_tf = time_mag_index_t0
-while time_mag[time_mag_index_tf] < tf:
-    time_mag_index_tf += 1
-    print('\rtf MAG index = {}/{}'.format(time_mag_index_tf,length), end='')
-    continue
-print('\n')
+def cropTimeToRef(seriesaxis,timeaxis,reftimeaxis,searchdivisions=5):
+    # searchdivisions defines the number of times to split timeaxis when searching for t0
+    # reftimeaxis is the reference time axis being cropped to
+    # timeaxis is the time axis being cropped
+    # seriesaxis is the corresponding series being cropped the same as timeaxis
 
-time_mag = time_mag[time_mag_index_t0:time_mag_index_tf]
+    t0 = reftimeaxis[0] # start of reference timeframe
+    tf = reftimeaxis[-1] # end of reference timeframe
 
-B_mag = cdf_mag['B_SRF']#[500000:]
-B_mag = B_mag[time_mag_index_t0:time_mag_index_tf] # reported MAG B, cropped to match EAS timeframe
+    length = len(timeaxis)
+
+    if length != len(seriesaxis):
+        raise Exception('time and series axes must be the same size!')
+    if len(reftimeaxis) > length:
+        raise Exception('reference axis must be shorter than the axis to be cropped!')
+    
+    print('\n')
+    time_index_t0 = 0
+    for i in range(1,searchdivisions+1):
+        time_index_t0 += int(length/2**i)*(timeaxis[time_index_t0+int(length/2**i)] < t0) # add smaller and smaller slices to converge on the right time_mag index for t0
+    while timeaxis[time_index_t0] < t0:
+        time_index_t0 += 1
+        print('\rt0 index = {}/{}'.format(time_index_t0,length), end='')
+        continue
+    print('\n')
+    time_index_tf = time_index_t0
+    while timeaxis[time_index_tf] < tf:
+        time_index_tf += 1
+        print('\rtf index = {}/{}'.format(time_index_tf,length), end='')
+        continue
+    print('\n')
+
+    timeaxisCropped = timeaxis[time_index_t0:time_index_tf]
+    seriesaxisCropped = seriesaxis[time_index_t0:time_index_tf]
+
+    return seriesaxisCropped, timeaxisCropped
+
 B_eas = cdf_eas['SWA_EAS_MagDataUsed'] # onboard EAS B
+B_mag = cdf_mag['B_SRF'] # reported MAG B
+B_mag, time_mag = cropTimeToRef(B_mag,time_mag,time_eas)
 
 B_angle = np.ndarray((len(B_mag)))
 for i in range(len(B_mag)):
@@ -52,14 +68,6 @@ for i in range(len(B_mag)):
     #calculate angles between MAG vectors and EAS vectors:
     vector_eas = B_eas[i]
     B_angle[i] = np.arccos(np.dot(vector_mag,vector_eas))*180/np.pi
-
-'''
-vector_mag = B_mag[-10]
-vector_eas = B_eas[-10]
-print(vector_mag)
-print(vector_eas)
-print(np.arccos(np.dot(vector_mag,vector_eas))*180/np.pi)
-'''
 
 Bx_mag, By_mag, Bz_mag = np.array(B_mag).T
 Bx_eas, By_eas, Bz_eas = np.array(B_eas).T
@@ -92,6 +100,7 @@ axs[2].set_ylim(-1.2,1.2)
 axs[2].grid()
 
 axs[3].plot(time_mag,B_angle, color='green')
+#axs[3].plot(time_eas[:-1],B_angle, color='red')
 axs[3].set_ylabel('angle between B vectors (°)')
 tick_spacing = 5 # degrees
 axs[3].yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
