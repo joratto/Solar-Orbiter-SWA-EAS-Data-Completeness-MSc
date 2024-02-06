@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import seaborn as sns
@@ -9,6 +10,7 @@ import datetime
 
 cdf_filename_eas = 'solo_L1_swa-eas-padc_20230831T172734-20230831T173233_V01.cdf'
 cdf_eas = pycdf.CDF('data\\' + cdf_filename_eas)
+#print(cdf_eas)
 time_eas = np.array(cdf_eas['EPOCH'])
 t0 = time_eas[0] # start of timeframe
 tf = time_eas[-1] # end of timeframe
@@ -16,6 +18,7 @@ print('EAS time series from {} to {}'.format(t0, tf))
 
 cdf_filename_mag = 'solo_L2_mag-srf-normal_20230831_V01.cdf'
 cdf_mag = pycdf.CDF('data\\' + cdf_filename_mag)
+#print(cdf_mag)
 time_mag = cdf_mag['EPOCH']#[500000:])
 
 def cropTimeToRef(seriesaxis,timeaxis,reftimeaxis,searchdivisions=5):
@@ -69,14 +72,35 @@ for i in range(len(B_mag)):
     vector_mag = B_mag[i]
     B_mag[i] = vector_mag/np.linalg.norm(vector_mag)
 
-    #calculate angles between MAG vectors and EAS vectors:
+    # calculate angles between MAG vectors and EAS vectors:
     vector_eas = B_eas[i]
     B_angle[i] = np.arccos(np.dot(vector_mag,vector_eas))*180/np.pi
 
 Bx_mag, By_mag, Bz_mag = np.array(B_mag).T
 Bx_eas, By_eas, Bz_eas = np.array(B_eas).T
 
-Nplots = 4
+def delayFinder(f,g,sr): 
+    # f and g are the functions to cross-correlate
+    # sr is the samplerate
+    # positive delays when f is ahead
+    corr = sp.signal.correlate(f,g,mode='full') # the correlation distribution
+    lags = sp.signal.correlation_lags(f.size,g.size,mode='full')/sr # range of possible delays ('lags'), scaled by samplerate
+    delay = lags[np.argmax(corr)]
+    return delay, lags, corr
+
+sr = 8
+
+delayBx, lagsBx, corrBx = delayFinder(Bx_mag,Bx_eas,sr)
+delayBy, lagsBy, corrBy = delayFinder(By_mag,By_eas,sr)
+delayBz, lagsBz, corrBz = delayFinder(Bz_mag,Bz_eas,sr)
+'''
+delayBx, lagsBx, corrBx = delayFinder(np.pad(Bx_mag,(0,0)),Bx_eas[:],sr)
+delayBy, lagsBy, corrBy = delayFinder(np.pad(By_mag,(0,0)),By_eas[:],sr)
+delayBz, lagsBz, corrBz = delayFinder(np.pad(Bz_mag,(0,0)),Bz_eas[:],sr)
+'''
+print('B delays (s) = ({},{},{})'.format(delayBx,delayBy,delayBz))
+
+Nplots = 5
 sns.set_theme(style='ticks')
 fig, axs = plt.subplots(Nplots)
 
@@ -111,7 +135,15 @@ axs[3].yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
 #axs[3].yaxis.set_major_formatter('{x}°')
 axs[3].grid()
 
-axs[Nplots-1].set_xlabel('Date & Time (dd hh:mm)')
+axs[Nplots-2].set_xlabel('Date & Time (dd hh:mm)')#axs[Nplots-1].set_xlabel('Date & Time (dd hh:mm)')
+
+axs[Nplots-1].plot(lagsBx,corrBx)
+axs[Nplots-1].plot(lagsBy,corrBy)
+axs[Nplots-1].plot(lagsBz,corrBz)
+axs[Nplots-1].set_ylabel('correlation (dimensionless)')
+axs[Nplots-1].set_xlabel('possible time delays')
+axs[Nplots-1].legend(["Bx Correlation", "By Correlation", "Bz Correlation"])
+axs[Nplots-1].grid()
 
 # quick calculation of the angle difference between B vectors
 # print('{} degrees'.format(180*(np.arctan(Bz_mag[0]/Bx_mag[0])/90/np.pi - np.arctan(Bz_eas[0]/Bx_eas[0])/np.pi)))
