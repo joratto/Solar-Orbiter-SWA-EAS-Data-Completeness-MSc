@@ -8,15 +8,16 @@ os.environ["CDF_LIB"] = "C:\\Program Files\\CDF_Distribution"
 from spacepy import pycdf
 import datetime
 
-cdf_filename_eas = 'solo_L1_swa-eas-padc_20230831T172734-20230831T173233_V01.cdf'
+cdf_filename_eas = 'solo_L1_swa-eas-padc_20230530T172732-20230530T173231_V01.cdf'#solo_L1_swa-eas-padc_20230831T172734-20230831T173233_V01.cdf'
 cdf_eas = pycdf.CDF('data\\' + cdf_filename_eas)
 #print(cdf_eas)
 time_eas = np.array(cdf_eas['EPOCH'])
+#print(time_eas)
 t0 = time_eas[0] # start of timeframe
 tf = time_eas[-1] # end of timeframe
 print('EAS time series from {} to {}'.format(t0, tf))
 
-cdf_filename_mag = 'solo_L2_mag-srf-normal_20230831_V01.cdf'
+cdf_filename_mag = 'solo_L2_mag-srf-normal_20230530_V01.cdf'#'solo_L2_mag-srf-normal_20230831_V01.cdf'
 cdf_mag = pycdf.CDF('data\\' + cdf_filename_mag)
 #print(cdf_mag)
 time_mag = cdf_mag['EPOCH']#[500000:])
@@ -66,14 +67,25 @@ B_eas = cdf_eas['SWA_EAS_MagDataUsed'] # onboard EAS B
 B_mag = cdf_mag['B_SRF'] # reported MAG B
 B_mag, time_mag = cropTimeToRef(B_mag,time_mag,time_eas)
 
+B_eas_magnitude = np.ndarray((len(B_eas)))
+B_mag_magnitude = np.ndarray((len(B_mag)))
+
 B_angle = np.ndarray((len(B_mag)))
+
 for i in range(len(B_mag)):
-    # normalise B_mag:
+    # calculate vectors and magnitudes:
     vector_mag = B_mag[i]
-    B_mag[i] = vector_mag/np.linalg.norm(vector_mag)
+    vector_mag_magnitude = np.linalg.norm(vector_mag)
+    B_mag_magnitude[i] = vector_mag_magnitude
+
+    vector_eas = B_eas[i]
+    vector_eas_magnitude = np.linalg.norm(vector_eas)
+    B_eas_magnitude[i] = vector_eas_magnitude
+
+    # normalise B_mag:
+    B_mag[i] = vector_mag/vector_mag_magnitude
 
     # calculate angles between MAG vectors and EAS vectors:
-    vector_eas = B_eas[i]
     B_angle[i] = np.arccos(np.dot(vector_mag,vector_eas))*180/np.pi
 
 Bx_mag, By_mag, Bz_mag = np.array(B_mag).T
@@ -83,24 +95,33 @@ def delayFinder(f,g,sr):
     # f and g are the functions to cross-correlate
     # sr is the samplerate
     # positive delays when f is ahead
+
     corr = sp.signal.correlate(f,g,mode='full') # the correlation distribution
     lags = sp.signal.correlation_lags(f.size,g.size,mode='full')/sr # range of possible delays ('lags'), scaled by samplerate
     delay = lags[np.argmax(corr)]
+
     return delay, lags, corr
+
+#def delayFinder2(data_1,data_2,sr):
+#    correlation = np.correlate(data_1, data_2, mode='same')
+#    delay = ( np.argmax(correlation) - int(len(correlation)/2) ) / sr
+#    return delay
 
 sr = 8
 
-delayBx, lagsBx, corrBx = delayFinder(Bx_mag,Bx_eas,sr)
-delayBy, lagsBy, corrBy = delayFinder(By_mag,By_eas,sr)
-delayBz, lagsBz, corrBz = delayFinder(Bz_mag,Bz_eas,sr)
-'''
 delayBx, lagsBx, corrBx = delayFinder(np.pad(Bx_mag,(0,0)),Bx_eas[:],sr)
 delayBy, lagsBy, corrBy = delayFinder(np.pad(By_mag,(0,0)),By_eas[:],sr)
 delayBz, lagsBz, corrBz = delayFinder(np.pad(Bz_mag,(0,0)),Bz_eas[:],sr)
-'''
-print('B delays (s) = ({},{},{})'.format(delayBx,delayBy,delayBz))
 
-Nplots = 5
+print('B delays (s) = ({},{},{})'.format(delayBx,delayBy,delayBz))
+#print('B delays (s) = ({},{},{})'.format(delayFinder2(Bx_mag,Bx_eas,sr), delayFinder2(By_mag,Bz_eas,sr), delayFinder2(Bz_mag,Bz_eas,sr)))
+
+for i in range(len(corrBx)):
+    corrBx[i] = np.linalg.norm(corrBx[i])
+    corrBy[i] = np.linalg.norm(corrBy[i])
+    corrBz[i] = np.linalg.norm(corrBz[i])
+
+Nplots = 4
 sns.set_theme(style='ticks')
 fig, axs = plt.subplots(Nplots)
 
@@ -108,45 +129,67 @@ axs[0].set_title('{}    &    {}'.format(cdf_filename_eas, cdf_filename_mag))
 
 axs[0].plot(time_mag,Bx_mag)
 axs[0].plot(time_eas,Bx_eas)
-axs[0].set_ylabel('Bx (normalised)')
-axs[0].legend(["Bx MAG", "Bx EAS"])
+axs[0].set_ylabel(r'$B_{x}$'+'\n(normalised)')
+axs[0].legend([r"$B_{MAG,x}$", r"$B_{EAS,x}$"])
 axs[0].set_ylim(-1.2,1.2)
 axs[0].grid()
 
 axs[1].plot(time_mag,By_mag)
 axs[1].plot(time_eas,By_eas)
-axs[1].set_ylabel('By (normalised)')
-axs[1].legend(["By MAG", "By EAS"])
+axs[1].set_ylabel(r'$B_{y}$'+'\n(normalised)')
+axs[1].legend([r"$B_{MAG,y}$", r"$B_{EAS,y}$"])
 axs[1].set_ylim(-1.2,1.2)
 axs[1].grid()
 
 axs[2].plot(time_mag,Bz_mag)
 axs[2].plot(time_eas,Bz_eas)
-axs[2].set_ylabel('Bz (normalised)')
-axs[2].legend(["Bz MAG", "Bz EAS"])
+axs[2].set_ylabel(r'$B_{z}$'+'\n(normalised)')
+axs[2].legend([r"$B_{MAG,z}$", r"$B_{EAS,z}$"])
 axs[2].set_ylim(-1.2,1.2)
 axs[2].grid()
 
 axs[3].plot(time_mag,B_angle, color='green')
-#axs[3].plot(time_eas[:-1],B_angle, color='red')
-axs[3].set_ylabel('angle between B vectors (°)')
-tick_spacing = 5 # degrees
+#axs[3].plot(time_eas[:-1],B_angle, color='red') # in case you want to compare the two same series! (one is  currently one point shorter, for some reason)
+axs[3].set_ylabel('angle between\nB vectors (°)')
+tick_spacing = 2 # degrees
 axs[3].yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
-#axs[3].yaxis.set_major_formatter('{x}°')
+axs[3].legend([r'$B_{MAG}-B_{EAS}$ Angle'])
 axs[3].grid()
 
-axs[Nplots-2].set_xlabel('Date & Time (dd hh:mm)')#axs[Nplots-1].set_xlabel('Date & Time (dd hh:mm)')
+axs[Nplots-1].set_xlabel('Date & Time\n(dd hh:mm)')#axs[Nplots-1].set_xlabel('Date & Time (dd hh:mm)')
 
-axs[Nplots-1].plot(lagsBx,corrBx)
-axs[Nplots-1].plot(lagsBy,corrBy)
-axs[Nplots-1].plot(lagsBz,corrBz)
-axs[Nplots-1].set_ylabel('correlation (dimensionless)')
-axs[Nplots-1].set_xlabel('possible time delays')
-axs[Nplots-1].legend(["Bx Correlation", "By Correlation", "Bz Correlation"])
-axs[Nplots-1].grid()
+'''
+axs[0].plot(time_mag,Bx_mag)
+axs[0].plot(time_eas,Bx_eas)
+axs[0].plot(time_mag,By_mag)
+axs[0].plot(time_eas,By_eas)
+axs[0].plot(time_mag,Bz_mag)
+axs[0].plot(time_eas,Bz_eas)
+axs[0].set_ylabel('B\n(normalised)')
+axs[0].legend(["Bx MAG", "Bx EAS","By MAG", "By EAS","Bz MAG", "Bz EAS"])
+axs[0].set_ylim(-1.2,1.2)
+axs[0].grid()
+'''
+'''
+axs[3].plot(time_mag,B_mag_magnitude)
+axs[3].plot(time_eas,B_eas_magnitude)
+axs[3].set_ylabel('|B|\n(nT)')
+axs[3].legend(["|B| MAG", "|B| EAS"])
+axs[3].set_ylim(-1.2,1.2)
+axs[3].grid()
+'''
 
-# quick calculation of the angle difference between B vectors
-# print('{} degrees'.format(180*(np.arctan(Bz_mag[0]/Bx_mag[0])/90/np.pi - np.arctan(Bz_eas[0]/Bx_eas[0])/np.pi)))
-# print('{} degrees'.format(180*(np.arctan(By_mag[0]/Bx_mag[0])/90/np.pi - np.arctan(By_eas[0]/Bx_eas[0])/90/np.pi)))
+'''
+#axs[Nplots-1].plot(lagsBx,corrBx)
+#axs[Nplots-1].plot(lagsBy,corrBy)
+#axs[Nplots-1].plot(lagsBz,corrBz)
+#axs[Nplots-1].set_ylabel('correlation\n(dimensionless)')
+#axs[Nplots-1].set_xlabel('possible time delays (seconds)')
+#axs[Nplots-1].set_yticklabels([''])
+#axs[Nplots-1].legend(["Bx Correlation", "By Correlation", "Bz Correlation"])
+#axs[Nplots-1].grid()
+
+plt.show(block=True) # set to block=False to automatically close figure
+'''
 
 plt.show()

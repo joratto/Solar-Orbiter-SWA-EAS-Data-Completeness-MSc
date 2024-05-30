@@ -55,11 +55,11 @@ def Gauss(x,a=1,b=0,c=1):
     # b	=	the position of the center of the peak
     # c	=	the standard deviation
 
-N = 1000000
-T = 600 # s
+N = 100
+T = 610 # s
 sr = N/T
 x = np.linspace(0,T,N)
-dt = 141.5926535897932384626433 # s
+dt = 61.5926535897932384626433 # s
 a = 1
 b = 300
 c = 50
