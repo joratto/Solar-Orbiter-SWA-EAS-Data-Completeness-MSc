@@ -22,50 +22,86 @@ cdf_mag = pycdf.CDF('data\\' + cdf_filename_mag)
 #print(cdf_mag)
 time_mag = cdf_mag['EPOCH']#[500000:])
 
-def cropTimeToRef(seriesaxis,timeaxis,reftimeaxis,searchdivisions=5):
-    # searchdivisions defines the number of times to split timeaxis when searching for t0
-    # reftimeaxis is the reference time axis being cropped to
-    # timeaxis is the time axis being cropped
-    # seriesaxis is the corresponding series being cropped the same as timeaxis
+t0_eas = time_eas[0] # start of B EAS timeframe
+t0_mag = time_mag[0] # start of B MAG timeframe
+tf_eas = time_eas[-1] # end of B EAS timeframe
+tf_mag = time_mag[-1] # end of B MAG timeframe
 
-    t0 = reftimeaxis[0] # start of reference timeframe
-    tf = reftimeaxis[-1] # end of reference timeframe
 
-    length = len(timeaxis)
+def cropTime_indexFinder(timeArray,timeReference,searchdivisions=5):
+    # this function finds a time index given a time, efficiently.
 
-    if length != len(seriesaxis):
-        raise Exception('time and series axes must be the same size!')
-    if len(reftimeaxis) > length:
-        raise Exception('reference timeframe must be shorter than the timeframe to be cropped!')
-    
-    print('\n')
-    time_index_t0 = 0
+    # timeArray is the time array where you're finding an index.
+    # timeReference is the reference time whose index you're trying to find.
+    # searchdivisions is the number of times timeArray should be divided to narrow the search space.
+    length = len(timeArray)
+    time_index = 0
     for i in range(1,searchdivisions+1):
-        time_index_t0 += int(length/2**i)*(timeaxis[time_index_t0+int(length/2**i)] < t0) # add smaller and smaller slices to converge on the right time_mag index for t0
-    while timeaxis[time_index_t0] < t0:
-        if time_index_t0 >= length:
-            raise Exception('reference timeframe not contained within the timeframe to be cropped!')
-        time_index_t0 += 1
-        print('\rt0 index = {}/{}'.format(time_index_t0,length), end='')
-        continue
-    print('\n')
-    time_index_tf = time_index_t0
-    while timeaxis[time_index_tf] < tf:
-        if time_index_tf >= length:
-            break # because the time axis to be cropped ends too early
-        time_index_tf += 1
-        print('\rtf index = {}/{}'.format(time_index_tf,length), end='')
+        time_index += int(length/2**i)*(timeArray[time_index+int(length/2**i)] < t0) # add smaller and smaller slices to converge on the right time index for t0
+    while timeArray[time_index] < timeReference:
+        time_index += 1
+        print('\rtime index = {}/{}'.format(time_index,length), end='')
         continue
     print('\n')
 
-    timeaxisCropped = timeaxis[time_index_t0:time_index_tf]
-    seriesaxisCropped = seriesaxis[time_index_t0:time_index_tf]
+    return time_index
 
-    return seriesaxisCropped, timeaxisCropped
+
+def cropTimeToOverlap(seriesA,timeA,seriesB,timeB,searchdivisions=5):
+    # crops two time series to the period where they overlap in time
+
+    if len(timeA) != len(seriesA) or len(timeB) != len(seriesB):
+        raise Exception('all time and series axes must be the same size!')
+
+    t0A = timeA[0] # timeA start
+    t0B = timeB[0] # timeB start
+    tfA = timeA[-1] # timeA finish
+    tfB = timeB[-1] # timeB finish
+
+    if t0A > tfB or t0B > tfA:
+        raise Exception('these time series do not overlap!')
+
+    print('\n')
+    print('t0A = {}'.format(t0A))
+    print('t0B = {}'.format(t0B))
+
+    if t0A > t0B: # if t0A is later than t0B, start at t0A, therefore series B starts early.
+        print('overlap starts at {}'.format(t0A))
+        time_index_t0 = cropTime_indexFinder(timeB, t0A, searchdivisions)
+        timeB = timeB[time_index_t0:]
+        seriesB = seriesB[time_index_t0:]
+        
+    else: # vice versa.
+        print('overlap starts at {}'.format(t0B))
+        time_index_t0 = cropTime_indexFinder(timeA, t0B, searchdivisions)
+        timeA = timeA[time_index_t0:]
+        seriesA = seriesA[time_index_t0:]
+        
+
+    print('\n')
+    print('tfA = {}'.format(tfA))
+    print('tfB = {}'.format(tfB))
+
+    if tfA > tfB: # if tfA is later than tfB, finish at tfB, therefore series A finishes late.
+        print('overlap finishes at {}'.format(t0B))
+        time_index_t0 = cropTime_indexFinder(timeA, tfB, searchdivisions)
+        timeA = timeA[:time_index_t0]
+        seriesA = seriesA[:time_index_t0]
+        
+    else: # vice versa.
+        print('overlap finishes at {}'.format(t0A))
+        time_index_t0 = cropTime_indexFinder(timeB, tfA, searchdivisions)
+        timeB = timeB[:time_index_t0]
+        seriesB = seriesB[:time_index_t0]
+        
+
+    return seriesA, timeA, seriesB, timeB
+
 
 B_eas = cdf_eas['SWA_EAS_MagDataUsed'] # onboard EAS B
 B_mag = cdf_mag['B_SRF'] # reported MAG B
-B_mag, time_mag = cropTimeToRef(B_mag,time_mag,time_eas)
+
+B_mag, time_mag, B_eas, time_eas = cropTimeToOverlap(B_mag, time_mag, B_eas, time_eas, searchdivisions=5)
 
 B_eas_magnitude = np.ndarray((len(B_eas)))
 B_mag_magnitude = np.ndarray((len(B_mag)))
@@ -113,7 +149,7 @@ delayBx, lagsBx, corrBx = delayFinder(np.pad(Bx_mag,(0,0)),Bx_eas[:],sr)
 delayBy, lagsBy, corrBy = delayFinder(np.pad(By_mag,(0,0)),By_eas[:],sr)
 delayBz, lagsBz, corrBz = delayFinder(np.pad(Bz_mag,(0,0)),Bz_eas[:],sr)
 
-print('B delays (s) = ({},{},{})'.format(delayBx,delayBy,delayBz))
+#print('B delays (s) = ({},{},{})'.format(delayBx,delayBy,delayBz))
 #print('B delays (s) = ({},{},{})'.format(delayFinder2(Bx_mag,Bx_eas,sr), delayFinder2(By_mag,Bz_eas,sr), delayFinder2(Bz_mag,Bz_eas,sr)))
 
 for i in range(len(corrBx)):
