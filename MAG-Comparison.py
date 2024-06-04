@@ -176,14 +176,12 @@ for i in range(len(corrBx)):
     corrBz[i] = np.linalg.norm(corrBz[i])
 
 coordinates = 'SRF' # 'SRF','EASX'
-if coordinates == 'SRF':
-    Bx_mag, By_mag, Bz_mag = Bx_mag, By_mag, Bz_mag
-    Bx_eas, By_eas, Bz_eas = Bx_eas, By_eas, Bz_eas
-elif coordinates == 'EASX':
-    Bx_mag, By_mag, Bz_mag = Bx_mag_EASX, By_mag_EASX, Bz_mag_EASX
-    Bx_eas, By_eas, Bz_eas = Bx_eas_EASX, By_eas_EASX, Bz_eas_EASX
+coordinates_dictionary = {'SRF':((Bx_mag, By_mag, Bz_mag),(Bx_eas, By_eas, Bz_eas)), 
+                          'EASX':((Bx_mag_EASX, By_mag_EASX, Bz_mag_EASX),(Bx_eas_EASX, By_eas_EASX, Bz_eas_EASX))}
+Bx_mag, By_mag, Bz_mag = coordinates_dictionary[coordinates][0]
+Bx_eas, By_eas, Bz_eas = coordinates_dictionary[coordinates][1]
 
-Nplots = 4
+Nplots = 4 # number of plots to show
 sns.set_theme(style='ticks')
 fig1, axs = plt.subplots(Nplots)
 
