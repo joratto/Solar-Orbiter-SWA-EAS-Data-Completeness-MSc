@@ -97,6 +97,35 @@ def cropTimeToOverlap(seriesA,timeA,seriesB,timeB,searchdivisions=5):
 
     return seriesA, timeA, seriesB, timeB
 
+
+def cartToSphere(vector):
+    x, y, z, = vector[0], vector[1], vector[2]
+    R = np.sqrt(x**2+y**2+z**2)
+    theta = np.arctan2(np.sqrt(x**2+y**2+z**2),z) * 180/np.pi
+    phi = np.arctan2(y,x) * 180/np.pi
+    return np.array([R,theta,phi])
+
+
+def delayFinder(f,g,sr): 
+    # f and g are the functions to cross-correlate
+    # sr is the samplerate
+    # positive delays when f is ahead
+
+    corr = sp.signal.correlate(f,g,mode='full') # the correlation distribution
+    lags = sp.signal.correlation_lags(f.size,g.size,mode='full')/sr # range of possible delays ('lags'), scaled by samplerate
+    delay = lags[np.argmax(corr)]
+
+    return delay, lags, corr
+
+#def delayFinder2(data_1,data_2,sr):
+#    correlation = np.correlate(data_1, data_2, mode='same')
+#    delay = ( np.argmax(correlation) - int(len(correlation)/2) ) / sr
+#    return delay
+
+#print('B delays (s) = ({},{},{})'.format(delayBx,delayBy,delayBz))
+#print('B delays (s) = ({},{},{})'.format(delayFinder2(Bx_mag,Bx_eas,sr), delayFinder2(By_mag,Bz_eas,sr), delayFinder2(Bz_mag,Bz_eas,sr)))
+
+
 r2o2 = np.sqrt(2)/2 # root 2 over 2
 SRFtoEAS1 = np.array([[0,0,-1],[-r2o2,r2o2,0],[r2o2,r2o2,0]])
 SRFtoEAS2 = np.array([[0,0,1],[-r2o2,-r2o2,0],[r2o2,-r2o2,0]])
@@ -115,6 +144,14 @@ B_angle = np.ndarray((len(B_mag)))
 eas_used = cdf_eas['SWA_EAS_EasUsed']
 B_eas_EASX = np.ndarray((len(B_eas),3)) # (EASX)
 B_mag_EASX = np.ndarray((len(B_mag),3)) # (EASX)
+
+B_eas_spherical_SRF = np.ndarray((len(B_eas),3)) # (SRF)
+B_mag_spherical_SRF = np.ndarray((len(B_mag),3)) # (SRF)
+
+B_eas_spherical_EASX = np.ndarray((len(B_eas),3)) # (EASX)
+B_mag_spherical_EASX = np.ndarray((len(B_mag),3)) # (EASX)
+
+B_eas_elevation_used_EAS1, B_eas_elevation_used_EAS2 = np.array(cdf_eas['SWA_EAS_ELEVATION']).T
 
 for i in range(len(B_mag)):
     # calculate vectors and magnitudes:
@@ -136,50 +173,31 @@ for i in range(len(B_mag)):
     # transform from SRF to respective EAS head coordinates:
     vector_mag_magnitude_EASX = SRFtoEASX[eas_used[i]].dot(vector_mag)
     vector_eas_magnitude_EASX = SRFtoEASX[eas_used[i]].dot(vector_eas)
-    B_mag_EASX[i] = np.array(vector_mag_magnitude_EASX)
-    B_eas_EASX[i] = np.array(vector_eas_magnitude_EASX)
+    B_mag_EASX[i] = vector_mag_magnitude_EASX
+    B_eas_EASX[i] = vector_eas_magnitude_EASX
 
-Bx_mag, By_mag, Bz_mag = np.array(B_mag).T
-Bx_eas, By_eas, Bz_eas = np.array(B_eas).T
+    # transform SRF and EASX to respective spherical coordinates w/elevation and azimuth:
+    B_mag_spherical_SRF[i] = cartToSphere(vector_mag)
+    B_mag_spherical_EASX[i] = cartToSphere(vector_mag_magnitude_EASX)
+    B_eas_spherical_SRF[i] = cartToSphere(vector_eas)
+    B_eas_spherical_EASX[i] = cartToSphere(vector_eas_magnitude_EASX)
 
-Bx_mag_EASX, By_mag_EASX, Bz_mag_EASX = np.array(B_mag_EASX).T
-Bx_eas_EASX, By_eas_EASX, Bz_eas_EASX = np.array(B_eas_EASX).T
-
-def delayFinder(f,g,sr): 
-    # f and g are the functions to cross-correlate
-    # sr is the samplerate
-    # positive delays when f is ahead
-
-    corr = sp.signal.correlate(f,g,mode='full') # the correlation distribution
-    lags = sp.signal.correlation_lags(f.size,g.size,mode='full')/sr # range of possible delays ('lags'), scaled by samplerate
-    delay = lags[np.argmax(corr)]
-
-    return delay, lags, corr
-
-#def delayFinder2(data_1,data_2,sr):
-#    correlation = np.correlate(data_1, data_2, mode='same')
-#    delay = ( np.argmax(correlation) - int(len(correlation)/2) ) / sr
-#    return delay
+geometry = 'cartesian' # 'cartesian', 'spherical'
+coordinates = 'EASX' # 'SRF','EASX'
+coordinates_dictionary = {'SRF':{'cartesian':(B_mag,B_eas),'spherical':(B_mag_spherical_SRF,B_eas_spherical_SRF)}, 
+                        'EASX':{'cartesian':(B_mag_EASX,B_eas_EASX),'spherical':(B_mag_spherical_EASX,B_eas_spherical_EASX)}}
+Bx_mag, By_mag, Bz_mag = np.array(coordinates_dictionary[coordinates][geometry][0]).T
+Bx_eas, By_eas, Bz_eas = np.array(coordinates_dictionary[coordinates][geometry][1]).T
 
 sr = 8
-
 delayBx, lagsBx, corrBx = delayFinder(np.pad(Bx_mag,(0,0)),Bx_eas[:],sr)
 delayBy, lagsBy, corrBy = delayFinder(np.pad(By_mag,(0,0)),By_eas[:],sr)
 delayBz, lagsBz, corrBz = delayFinder(np.pad(Bz_mag,(0,0)),Bz_eas[:],sr)
-
-#print('B delays (s) = ({},{},{})'.format(delayBx,delayBy,delayBz))
-#print('B delays (s) = ({},{},{})'.format(delayFinder2(Bx_mag,Bx_eas,sr), delayFinder2(By_mag,Bz_eas,sr), delayFinder2(Bz_mag,Bz_eas,sr)))
 
 for i in range(len(corrBx)):
     corrBx[i] = np.linalg.norm(corrBx[i])
     corrBy[i] = np.linalg.norm(corrBy[i])
     corrBz[i] = np.linalg.norm(corrBz[i])
-
-coordinates = 'SRF' # 'SRF','EASX'
-coordinates_dictionary = {'SRF':((Bx_mag, By_mag, Bz_mag),(Bx_eas, By_eas, Bz_eas)), 
-                          'EASX':((Bx_mag_EASX, By_mag_EASX, Bz_mag_EASX),(Bx_eas_EASX, By_eas_EASX, Bz_eas_EASX))}
-Bx_mag, By_mag, Bz_mag = coordinates_dictionary[coordinates][0]
-Bx_eas, By_eas, Bz_eas = coordinates_dictionary[coordinates][1]
 
 Nplots = 4 # number of plots to show
 sns.set_theme(style='ticks')
@@ -187,76 +205,137 @@ fig1, axs = plt.subplots(Nplots)
 
 axs[0].set_title('{}    &    {}'.format(cdf_filename_eas, cdf_filename_mag))
 
-axs[0].plot(time_mag,Bx_mag)
-axs[0].plot(time_eas,Bx_eas)
-axs[0].set_ylabel(r'$B_{x}$'+'\n(unit {})'.format(coordinates))
-axs[0].legend([r"$B_{MAG,x}$", r"$B_{EAS,x}$"])
-axs[0].set_ylim(-1.2,1.2)
-axs[0].grid()
+'''
+# unit BR comparison
+ax = axs[0]
+ax.plot(time_mag,Bx_mag)
+ax.plot(time_eas[:-1],Bx_eas[:-1])
+ax.set_ylabel(r'$B_{r}$'+'\n(unit {})'.format(coordinates))
+ax.legend([r"$B_{MAG,r}$", r"$B_{EAS,r}$"])
+ax.set_ylim(-1.2,1.2)
+ax.grid()
 
-axs[1].plot(time_mag,By_mag)
-axs[1].plot(time_eas,By_eas)
-axs[1].set_ylabel(r'$B_{y}$'+'\n(unit {})'.format(coordinates))
-axs[1].legend([r"$B_{MAG,y}$", r"$B_{EAS,y}$"])
-axs[1].set_ylim(-1.2,1.2)
-axs[1].grid()
+# unit Btheta comparison
+ax = axs[1]
+ax.plot(time_mag,By_mag)
+ax.plot(time_eas[:-1],By_eas[:-1])
+ax.plot(time_eas[:-1],B_eas_elevation_used_EAS1[:-1])
+ax.plot(time_eas[:-1],B_eas_elevation_used_EAS2[:-1])
+ax.set_ylabel(r'$B_{θ}$'+'\n(degrees {})'.format(coordinates))
+ax.legend([r"$B_{MAG,θ}$", r"$B_{EAS,θ}$", r"$B_{EAS1_Used,θ}$", r"$B_{EAS2_Used,θ}$"])
+#ax.set_ylim(-50,50)
+ax.grid()
 
-axs[2].plot(time_mag,Bz_mag)
-axs[2].plot(time_eas,Bz_eas)
-axs[2].set_ylabel(r'$B_{z}$'+'\n(unit {})'.format(coordinates))
-axs[2].legend([r"$B_{MAG,z}$", r"$B_{EAS,z}$"])
-axs[2].set_ylim(-1.2,1.2)
-axs[2].grid()
+# unit Bphi comparison
+ax = axs[2]
+ax.plot(time_mag,Bz_mag)
+ax.plot(time_eas[:-1],Bz_eas[:-1])
+ax.set_ylabel(r'$B_{φ}$'+'\n(degrees {})'.format(coordinates))
+ax.legend([r"$B_{MAG,φ}$", r"$B_{EAS,φ}$"])
+ax.set_ylim(-180,180)
+ax.grid()
 
-axs[3].plot(time_eas,eas_used,color='green')
-axs[3].set_ylabel('Sensor Used')
-axs[3].set_ylim(-0.2,1.2)
-axs[3].set_yticks([0,1],['EAS1','EAS2'])
-axs[3].grid()
+# EAS sensor head used
+ax = axs[3]
+ax.plot(time_eas,eas_used,color='green')
+ax.set_ylabel('Sensor Used')
+ax.set_ylim(-0.2,1.2)
+ax.set_yticks([0,1],['EAS1','EAS2'])
+ax.grid()
+'''
+
+
+# unit Bx comparison
+ax = axs[0]
+ax.plot(time_mag,Bx_mag)
+ax.plot(time_eas,Bx_eas)
+ax.set_ylabel(r'$B_{x}$'+'\n(unit {})'.format(coordinates))
+ax.legend([r"$B_{MAG,x}$", r"$B_{EAS,x}$"])
+ax.set_ylim(-1.2,1.2)
+ax.grid()
+
+# unit By comparison
+ax = axs[1]
+ax.plot(time_mag,By_mag)
+ax.plot(time_eas,By_eas)
+ax.set_ylabel(r'$B_{y}$'+'\n(unit {})'.format(coordinates))
+ax.legend([r"$B_{MAG,y}$", r"$B_{EAS,y}$"])
+ax.set_ylim(-1.2,1.2)
+ax.grid()
+
+# unit Bz comparison
+ax = axs[2]
+ax.plot(time_mag,Bz_mag)
+ax.plot(time_eas,Bz_eas)
+ax.set_ylabel(r'$B_{z}$'+'\n(unit {})'.format(coordinates))
+ax.legend([r"$B_{MAG,z}$", r"$B_{EAS,z}$"])
+ax.set_ylim(-1.2,1.2)
+ax.grid()
+
+# EAS sensor head used
+ax = axs[3]
+ax.plot(time_eas,eas_used,color='green')
+ax.set_ylabel('Sensor Used')
+ax.set_ylim(-0.2,1.2)
+ax.set_yticks([0,1],['EAS1','EAS2'])
+ax.grid()
+
 
 '''
-axs[3].plot(time_mag,B_angle, color='green')
-#axs[3].plot(time_eas[:-1],B_angle, color='red') # in case you want to compare the two same series! (one is  currently one point shorter, for some reason)
-axs[3].set_ylabel('angle between\nB vectors (°)')
+# EAS-MAG B-vector angle difference
+ax = axs[3]
+ax.plot(time_mag,B_angle, color='green')
+#ax.plot(time_eas[:-1],B_angle, color='red') # in case you want to compare the two same series! (one is  currently one point shorter, for some reason)
+ax.set_ylabel('angle between\nB vectors (°)')
 #tick_spacing = 2 # degrees
-#axs[3].yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
-axs[3].legend([r'$B_{MAG}-B_{EAS}$ Angle'])
-axs[3].grid()
+#ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+ax.legend([r'$B_{MAG}-B_{EAS}$ Angle'])
+ax.grid()
 
 axs[Nplots-1].set_xlabel('Date & Time\n(dd hh:mm)')#axs[Nplots-1].set_xlabel('Date & Time (dd hh:mm)')
 '''
+
 '''
-axs[0].plot(time_mag,Bx_mag)
-axs[0].plot(time_eas,Bx_eas)
-axs[0].plot(time_mag,By_mag)
-axs[0].plot(time_eas,By_eas)
-axs[0].plot(time_mag,Bz_mag)
-axs[0].plot(time_eas,Bz_eas)
-axs[0].set_ylabel('B\n(normalised)')
-axs[0].legend(["Bx MAG", "Bx EAS","By MAG", "By EAS","Bz MAG", "Bz EAS"])
-axs[0].set_ylim(-1.2,1.2)
-axs[0].grid()
-'''
-'''
-axs[3].plot(time_mag,B_mag_magnitude)
-axs[3].plot(time_eas,B_eas_magnitude)
-axs[3].set_ylabel('|B|\n(nT)')
-axs[3].legend(["|B| MAG", "|B| EAS"])
-axs[3].set_ylim(-1.2,1.2)
-axs[3].grid()
+# unit B comparison (all axes)
+ax = axs[0]
+ax.plot(time_mag,Bx_mag)
+ax.plot(time_eas,Bx_eas)
+ax.plot(time_mag,By_mag)
+ax.plot(time_eas,By_eas)
+ax.plot(time_mag,Bz_mag)
+ax.plot(time_eas,Bz_eas)
+ax.set_ylabel('B\n(normalised)')
+ax.legend(["Bx MAG", "Bx EAS","By MAG", "By EAS","Bz MAG", "Bz EAS"])
+ax.set_ylim(-1.2,1.2)
+ax.grid()
 '''
 
 '''
-#axs[Nplots-1].plot(lagsBx,corrBx)
-#axs[Nplots-1].plot(lagsBy,corrBy)
-#axs[Nplots-1].plot(lagsBz,corrBz)
-#axs[Nplots-1].set_ylabel('correlation\n(dimensionless)')
-#axs[Nplots-1].set_xlabel('possible time delays (seconds)')
-#axs[Nplots-1].set_yticklabels([''])
-#axs[Nplots-1].legend(["Bx Correlation", "By Correlation", "Bz Correlation"])
-#axs[Nplots-1].grid()
+# B magnitude comparison
+ax = axs[3]
+ax.plot(time_mag,B_mag_magnitude)
+ax.plot(time_eas,B_eas_magnitude)
+ax.set_ylabel('|B|\n(nT)')
+ax.legend(["|B| MAG", "|B| EAS"])
+ax.set_ylim(-1.2,1.2)
+ax.grid()
+'''
+
+'''
+# B time delay comparison
+ax = axs[Nplots-1]
+#ax.plot(lagsBx,corrBx)
+#ax.plot(lagsBy,corrBy)
+#ax.plot(lagsBz,corrBz)
+#ax.set_ylabel('correlation\n(dimensionless)')
+#ax.set_xlabel('possible time delays (seconds)')
+#ax.set_yticklabels([''])
+#ax.legend(["Bx Correlation", "By Correlation", "Bz Correlation"])
+#ax.grid()
 
 plt.show(block=True) # set to block=False to automatically close figure
 '''
+
+ax = axs[0]
 
 plt.show()
