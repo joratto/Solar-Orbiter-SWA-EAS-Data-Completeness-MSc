@@ -1,5 +1,7 @@
 import numpy as np
 import scipy as sp
+import astropy as astro
+import astropy.coordinates as astrocoo
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import seaborn as sns
@@ -8,16 +10,19 @@ os.environ["CDF_LIB"] = "C:\\Program Files\\CDF_Distribution"
 from spacepy import pycdf
 import datetime
 
+import functionsMSc as fx
+
+
+'''CDF configuration'''
 cdf_filename_eas = 'solo_L1_swa-eas-padc_20231105T172733-20231105T174232_V01.cdf'
+cdf_filename_mag = 'solo_L2_mag-srf-normal_20231105_V01.cdf'
+
+
+'''CDF preparation'''
 cdf_eas = pycdf.CDF('data\\' + cdf_filename_eas)
 #print(cdf_eas)
 time_eas = np.array(cdf_eas['EPOCH'])
-#print(time_eas)
-t0 = time_eas[0] # start of timeframe
-tf = time_eas[-1] # end of timeframe
-print('EAS time series from {} to {}'.format(t0, tf))
 
-cdf_filename_mag = 'solo_L2_mag-srf-normal_20231105_V01.cdf'#'solo_L2_mag-srf-normal_20230831_V01.cdf'
 cdf_mag = pycdf.CDF('data\\' + cdf_filename_mag)
 #print(cdf_mag)
 time_mag = cdf_mag['EPOCH']#[500000:])
@@ -26,115 +31,26 @@ t0_eas = time_eas[0] # start of B EAS timeframe
 t0_mag = time_mag[0] # start of B MAG timeframe
 tf_eas = time_eas[-1] # end of B EAS timeframe
 tf_mag = time_mag[-1] # end of B MAG timeframe
+print('EAS time series from {} to {}'.format(t0_eas, tf_eas))
+print('MAG time series from {} to {}'.format(t0_mag, tf_mag))
 
 
-def cropTime_indexFinder(timeArray,timeReference,searchdivisions=5):
-    # this function finds a time index given a time, efficiently.
-
-    # timeArray is the time array where you're finding an index.
-    # timeReference is the reference time whose index you're trying to find.
-    # searchdivisions is the number of times timeArray should be divided to narrow the search space.
-    length = len(timeArray)
-    time_index = 0
-    for i in range(1,searchdivisions+1):
-        time_index += int(length/2**i)*(timeArray[time_index+int(length/2**i)] < t0) # add smaller and smaller slices to converge on the right time index for t0
-    while timeArray[time_index] < timeReference:
-        time_index += 1
-        print('\rtime index = {}/{}'.format(time_index,length), end='')
-        continue
-    print('\n')
-
-    return time_index
-
-
-def cropTimeToOverlap(seriesA,timeA,seriesB,timeB,searchdivisions=5):
-    # crops two time series to the period where they overlap in time
-
-    if len(timeA) != len(seriesA) or len(timeB) != len(seriesB):
-        raise Exception('all time and series axes must be the same size!')
-
-    t0A = timeA[0] # timeA start
-    t0B = timeB[0] # timeB start
-    tfA = timeA[-1] # timeA finish
-    tfB = timeB[-1] # timeB finish
-
-    if t0A > tfB or t0B > tfA:
-        raise Exception('these time series do not overlap!')
-
-    print('\n')
-    print('t0A = {}'.format(t0A))
-    print('t0B = {}'.format(t0B))
-
-    if t0A > t0B: # if t0A is later than t0B, start at t0A, therefore series B starts early.
-        print('overlap starts at {}'.format(t0A))
-        time_index_t0 = cropTime_indexFinder(timeB, t0A, searchdivisions)
-        timeB = timeB[time_index_t0:]
-        seriesB = seriesB[time_index_t0:]
-        
-    else: # vice versa.
-        print('overlap starts at {}'.format(t0B))
-        time_index_t0 = cropTime_indexFinder(timeA, t0B, searchdivisions)
-        timeA = timeA[time_index_t0:]
-        seriesA = seriesA[time_index_t0:]
-        
-
-    print('\n')
-    print('tfA = {}'.format(tfA))
-    print('tfB = {}'.format(tfB))
-
-    if tfA > tfB: # if tfA is later than tfB, finish at tfB, therefore series A finishes late.
-        print('overlap finishes at {}'.format(t0B))
-        time_index_t0 = cropTime_indexFinder(timeA, tfB, searchdivisions)
-        timeA = timeA[:time_index_t0]
-        seriesA = seriesA[:time_index_t0]
-        
-    else: # vice versa.
-        print('overlap finishes at {}'.format(t0A))
-        time_index_t0 = cropTime_indexFinder(timeB, tfA, searchdivisions)
-        timeB = timeB[:time_index_t0]
-        seriesB = seriesB[:time_index_t0]
-        
-
-    return seriesA, timeA, seriesB, timeB
-
-
-def cartToSphere(vector):
-    x, y, z, = vector[0], vector[1], vector[2]
-    R = np.sqrt(x**2+y**2+z**2)
-    theta = np.arctan2(np.sqrt(x**2+y**2+z**2),z) * 180/np.pi
-    phi = np.arctan2(y,x) * 180/np.pi
-    return np.array([R,theta,phi])
-
-
-def delayFinder(f,g,sr): 
-    # f and g are the functions to cross-correlate
-    # sr is the samplerate
-    # positive delays when f is ahead
-
-    corr = sp.signal.correlate(f,g,mode='full') # the correlation distribution
-    lags = sp.signal.correlation_lags(f.size,g.size,mode='full')/sr # range of possible delays ('lags'), scaled by samplerate
-    delay = lags[np.argmax(corr)]
-
-    return delay, lags, corr
-
-#def delayFinder2(data_1,data_2,sr):
-#    correlation = np.correlate(data_1, data_2, mode='same')
-#    delay = ( np.argmax(correlation) - int(len(correlation)/2) ) / sr
-#    return delay
-
-#print('B delays (s) = ({},{},{})'.format(delayBx,delayBy,delayBz))
-#print('B delays (s) = ({},{},{})'.format(delayFinder2(Bx_mag,Bx_eas,sr), delayFinder2(By_mag,Bz_eas,sr), delayFinder2(Bz_mag,Bz_eas,sr)))
-
-
+'''transform matrices'''
 r2o2 = np.sqrt(2)/2 # root 2 over 2
 SRFtoEAS1 = np.array([[0,0,-1],[-r2o2,r2o2,0],[r2o2,r2o2,0]])
 SRFtoEAS2 = np.array([[0,0,1],[-r2o2,-r2o2,0],[r2o2,-r2o2,0]])
 SRFtoEASX = (SRFtoEAS1,SRFtoEAS2) # the transform matrices for SRF to the respective EAS head coordinates. First is EAS1, second is EAS2.
 
+EAS1toSRF = np.array([[0,-r2o2,r2o2],[0,r2o2,r2o2],[-1,0,0]])
+EAS2toSRF = np.array([[0,-r2o2,r2o2],[0,-r2o2,-r2o2],[1,0,0]])
+EASXtoSRF = (EAS1toSRF,EAS2toSRF) # the inverse transform matrices
+
+
+'''time series preparation'''
 B_eas = cdf_eas['SWA_EAS_MagDataUsed'] # onboard EAS B (SRF)
 B_mag = cdf_mag['B_SRF'] # reported MAG B (SRF)
 
-B_mag, time_mag, B_eas, time_eas = cropTimeToOverlap(B_mag, time_mag, B_eas, time_eas, searchdivisions=5)
+B_mag, time_mag, B_eas, time_eas = fx.cropTimeToOverlap(B_mag, time_mag, B_eas, time_eas, searchdivisions=5)
 
 B_eas_magnitude = np.ndarray((len(B_eas))) # (SRF)
 B_mag_magnitude = np.ndarray((len(B_mag))) # (SRF)
@@ -151,7 +67,7 @@ B_mag_spherical_SRF = np.ndarray((len(B_mag),3)) # (SRF)
 B_eas_spherical_EASX = np.ndarray((len(B_eas),3)) # (EASX)
 B_mag_spherical_EASX = np.ndarray((len(B_mag),3)) # (EASX)
 
-B_eas_elevation_used_EAS1, B_eas_elevation_used_EAS2 = np.array(cdf_eas['SWA_EAS_ELEVATION']).T
+B_eas_elevation_used_parallel, B_eas_elevation_used_antiparallel = np.array(cdf_eas['SWA_EAS_ELEVATION']).T
 
 for i in range(len(B_mag)):
     # calculate vectors and magnitudes:
@@ -177,27 +93,15 @@ for i in range(len(B_mag)):
     B_eas_EASX[i] = vector_eas_magnitude_EASX
 
     # transform SRF and EASX to respective spherical coordinates w/elevation and azimuth:
-    B_mag_spherical_SRF[i] = cartToSphere(vector_mag)
-    B_mag_spherical_EASX[i] = cartToSphere(vector_mag_magnitude_EASX)
-    B_eas_spherical_SRF[i] = cartToSphere(vector_eas)
-    B_eas_spherical_EASX[i] = cartToSphere(vector_eas_magnitude_EASX)
+    B_mag_spherical_SRF[i] = fx.cartToSphere(vector_mag)
+    B_mag_spherical_EASX[i] = fx.cartToSphere(vector_mag_magnitude_EASX)
+    B_eas_spherical_SRF[i] = fx.cartToSphere(vector_eas)
+    B_eas_spherical_EASX[i] = fx.cartToSphere(vector_eas_magnitude_EASX)
 
-geometry = 'cartesian' # 'cartesian', 'spherical'
+
+'''plot configuration'''
+geometry = 'spherical' # 'cartesian', 'spherical'
 coordinates = 'EASX' # 'SRF','EASX'
-coordinates_dictionary = {'SRF':{'cartesian':(B_mag,B_eas),'spherical':(B_mag_spherical_SRF,B_eas_spherical_SRF)}, 
-                        'EASX':{'cartesian':(B_mag_EASX,B_eas_EASX),'spherical':(B_mag_spherical_EASX,B_eas_spherical_EASX)}}
-Bx_mag, By_mag, Bz_mag = np.array(coordinates_dictionary[coordinates][geometry][0]).T
-Bx_eas, By_eas, Bz_eas = np.array(coordinates_dictionary[coordinates][geometry][1]).T
-
-sr = 8
-delayBx, lagsBx, corrBx = delayFinder(np.pad(Bx_mag,(0,0)),Bx_eas[:],sr)
-delayBy, lagsBy, corrBy = delayFinder(np.pad(By_mag,(0,0)),By_eas[:],sr)
-delayBz, lagsBz, corrBz = delayFinder(np.pad(Bz_mag,(0,0)),Bz_eas[:],sr)
-
-for i in range(len(corrBx)):
-    corrBx[i] = np.linalg.norm(corrBx[i])
-    corrBy[i] = np.linalg.norm(corrBy[i])
-    corrBz[i] = np.linalg.norm(corrBz[i])
 
 Nplots = 4 # number of plots to show
 sns.set_theme(style='ticks')
@@ -205,25 +109,47 @@ fig1, axs = plt.subplots(Nplots)
 
 axs[0].set_title('{}    &    {}'.format(cdf_filename_eas, cdf_filename_mag))
 
-'''
+
+'''coordinates options'''
+coordinates_dictionary = {'SRF':{'cartesian':(B_mag,B_eas),'spherical':(B_mag_spherical_SRF,B_eas_spherical_SRF)}, 
+                        'EASX':{'cartesian':(B_mag_EASX,B_eas_EASX),'spherical':(B_mag_spherical_EASX,B_eas_spherical_EASX)}}
+Bx_mag, By_mag, Bz_mag = np.array(coordinates_dictionary[coordinates][geometry][0]).T
+Bx_eas, By_eas, Bz_eas = np.array(coordinates_dictionary[coordinates][geometry][1]).T
+
+
+'''time delay stuff'''
+sr = 8
+delayBx, lagsBx, corrBx = fx.delayFinder(np.pad(Bx_mag,(0,0)),Bx_eas[:],sr)
+delayBy, lagsBy, corrBy = fx.delayFinder(np.pad(By_mag,(0,0)),By_eas[:],sr)
+delayBz, lagsBz, corrBz = fx.delayFinder(np.pad(Bz_mag,(0,0)),Bz_eas[:],sr)
+
+for i in range(len(corrBx)):
+    corrBx[i] = np.linalg.norm(corrBx[i])
+    corrBy[i] = np.linalg.norm(corrBy[i])
+    corrBz[i] = np.linalg.norm(corrBz[i])
+
+
+'''plots'''
 # unit BR comparison
 ax = axs[0]
 ax.plot(time_mag,Bx_mag)
 ax.plot(time_eas[:-1],Bx_eas[:-1])
 ax.set_ylabel(r'$B_{r}$'+'\n(unit {})'.format(coordinates))
 ax.legend([r"$B_{MAG,r}$", r"$B_{EAS,r}$"])
-ax.set_ylim(-1.2,1.2)
+ax.set_ylim(-0.2,2.2)
 ax.grid()
 
 # unit Btheta comparison
 ax = axs[1]
 ax.plot(time_mag,By_mag)
 ax.plot(time_eas[:-1],By_eas[:-1])
-ax.plot(time_eas[:-1],B_eas_elevation_used_EAS1[:-1])
-ax.plot(time_eas[:-1],B_eas_elevation_used_EAS2[:-1])
+ax.plot(time_eas[:-1],B_eas_elevation_used_parallel[:-1])
+ax.plot(time_eas[:-1],B_eas_elevation_used_antiparallel[:-1])
 ax.set_ylabel(r'$B_{θ}$'+'\n(degrees {})'.format(coordinates))
-ax.legend([r"$B_{MAG,θ}$", r"$B_{EAS,θ}$", r"$B_{EAS1_Used,θ}$", r"$B_{EAS2_Used,θ}$"])
-#ax.set_ylim(-50,50)
+ax.legend([r"$B_{MAG,θ}$", r"$B_{EAS,θ}$", r"$B_{EAS:Used,θ↑↑}$", r"$B_{EAS:Used,θ↑↓}$"])
+ax.set_ylim(-55,55)
+tick_spacing = 15 # degrees
+ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
 ax.grid()
 
 # unit Bphi comparison
@@ -232,7 +158,9 @@ ax.plot(time_mag,Bz_mag)
 ax.plot(time_eas[:-1],Bz_eas[:-1])
 ax.set_ylabel(r'$B_{φ}$'+'\n(degrees {})'.format(coordinates))
 ax.legend([r"$B_{MAG,φ}$", r"$B_{EAS,φ}$"])
-ax.set_ylim(-180,180)
+ax.set_ylim(-15,375)
+tick_spacing = 45 # degrees
+ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
 ax.grid()
 
 # EAS sensor head used
@@ -242,9 +170,9 @@ ax.set_ylabel('Sensor Used')
 ax.set_ylim(-0.2,1.2)
 ax.set_yticks([0,1],['EAS1','EAS2'])
 ax.grid()
+
+
 '''
-
-
 # unit Bx comparison
 ax = axs[0]
 ax.plot(time_mag,Bx_mag)
@@ -279,7 +207,7 @@ ax.set_ylabel('Sensor Used')
 ax.set_ylim(-0.2,1.2)
 ax.set_yticks([0,1],['EAS1','EAS2'])
 ax.grid()
-
+'''
 
 '''
 # EAS-MAG B-vector angle difference
