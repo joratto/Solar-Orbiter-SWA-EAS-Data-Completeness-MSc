@@ -134,30 +134,36 @@ def headPicker(vectorB,EAS1zAxis,EAS2zAxis):
     # EAS1zAxis = unit vector along EAS1 z-axis
     # EAS2zAxis = unit vector along EAS2 z-axis
     Bx, By, Bz = vectorB[0], vectorB[1], vectorB[2]
-    vectorBNew = np.array([abs(Bx),By,Bz]) # to make sure we get the shortes angle to each z axis
+    vectorBNew = np.array([Bx,By,Bz]) # to make sure we get the shortes angle to each z axis
     EAS1z_angle = np.arccos(np.clip(np.dot(vectorBNew,EAS1zAxis),-1,1))*180/np.pi # shortest angle in degrees
     EAS2z_angle = np.arccos(np.clip(np.dot(vectorBNew,EAS2zAxis),-1,1))*180/np.pi # shortest angle in degrees
     #print('{}, {}'.format(B_mag_EAS1z_angle, B_mag_EAS2z_angle))
     head = 0  # 0 indicates EAS1, 1 indicates EAS2
-    if EAS2z_angle > EAS1z_angle: # pick the head with the largest angle
+    if abs(abs(EAS2z_angle)-90) <= abs(abs(EAS1z_angle)-90): # pick the head with the smallest angle between B and the aperture midplane
         head = 1
     
     return head, EAS1z_angle, EAS2z_angle
 
 
-def binFinder(angle, binLowerBoundArray, binUpperBoundArray, dp=3):
+def binFinder(angle, binLowerBoundArray, binUpperBoundArray, dp=2):
     # calculates the index of the bin that an angle falls into
     # angle = angle in degrees
     # binLowerBoundArray = array of lower bounds of bins
     # binUpperBoundArray = array of upper bounds of bins
     # decimal points = number of decimal points for the lower and upper bounds to avoid contradictions that pop up
     binCount = len(binLowerBoundArray)
+    binMin = round(min(binLowerBoundArray), dp) # minimum value in binLowerBoundArray
+    binMax = round(max(binUpperBoundArray), dp) # maximum value in binUpperBoundArray
+    angle = round(np.clip(angle, binMin, binMax), dp) # clip the angle to within the bin range, and round to dp
     binIndex = 0
-    while not ((round(binLowerBoundArray[binIndex], dp) < round(angle, dp)) and (round(angle, dp) < round(binUpperBoundArray[binIndex], dp))):
-        binIndex += 1
-        if binIndex+1 == binCount:
-            '''angle out of range!'''
+    for i in range(binCount):
+        if (((round(binLowerBoundArray[binIndex], dp) <= angle) and (angle <= round(binUpperBoundArray[binIndex], dp)))) or (binIndex+1 == binCount):
             break
+        binIndex += 1
+    # while not ((round(binLowerBoundArray[binIndex], dp) < angle) and (angle < round(binUpperBoundArray[binIndex], dp))):
+    #     binIndex += 1
+    #     #if binIndex+1 == binCount:
+    #     #    '''angle out of range!'''
+    #     #    break
     # note: the "round" function behaves unusually, e.g. rounding 22.885 to 22.88 (see https://docs.python.org/2/library/functions.html#round). This should only affect elevation bin 12 (-22.885 vs -22.89), and the angle difference is minuscule anyway.
-
-    return binIndex
+    return binIndex #(binIndex + 1) % len(binLowerBoundArray)
