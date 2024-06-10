@@ -62,6 +62,8 @@ EAS1_bin_dict['ELEVATION_lower_bound'] = EAS1_bin_dict['ELEVATION'] - EAS1_bin_d
 EAS1_bin_dict['AZIMUTH_lower_bound'] = EAS1_bin_dict['AZIMUTH'] - EAS1_bin_dict['AZIMUTH_delta_lower']
 EAS1_bin_dict['ELEVATION_upper_bound'] = EAS1_bin_dict['ELEVATION'] + EAS1_bin_dict['ELEVATION_delta_upper'] # add elevation bin upper deltas to elevation bin centers to get the upper bounds
 EAS1_bin_dict['AZIMUTH_upper_bound'] = EAS1_bin_dict['AZIMUTH'] + EAS1_bin_dict['AZIMUTH_delta_upper']
+EAS1_bin_dict['ELEVATION_bin_count'] = len(EAS1_bin_dict['ELEVATION'])
+EAS1_bin_dict['AZIMUTH_bin_count'] = len(EAS1_bin_dict['AZIMUTH'])
 
 EAS2_bin_dict = {'ELEVATION':np.array([38.94,  28.25,  19.86,  12.99,   7.25,   2.35,  -1.93,  -5.78,  -9.37, -12.84, -16.32, -19.97, -23.97, -28.57, -34.13, -41.1]),
         'ELEVATION_delta_lower':np.array([6.06,  4.633, 3.761, 3.111, 2.624, 2.272, 2.012, 1.838, 1.747, 1.722, 1.759, 1.887, 2.113, 2.485, 3.071, 3.897]),
@@ -73,6 +75,8 @@ EAS2_bin_dict['ELEVATION_lower_bound'] = EAS2_bin_dict['ELEVATION'] - EAS2_bin_d
 EAS2_bin_dict['AZIMUTH_lower_bound'] = EAS2_bin_dict['AZIMUTH'] - EAS2_bin_dict['AZIMUTH_delta_lower']
 EAS2_bin_dict['ELEVATION_upper_bound'] = EAS2_bin_dict['ELEVATION'] + EAS2_bin_dict['ELEVATION_delta_upper'] # add elevation bin upper deltas to elevation bin centers to get the upper bounds
 EAS2_bin_dict['AZIMUTH_upper_bound'] = EAS2_bin_dict['AZIMUTH'] + EAS2_bin_dict['AZIMUTH_delta_upper']
+EAS2_bin_dict['ELEVATION_bin_count'] = len(EAS2_bin_dict['ELEVATION'])
+EAS2_bin_dict['AZIMUTH_bin_count'] = len(EAS2_bin_dict['AZIMUTH'])
 
 bin_dictionary = (EAS1_bin_dict, EAS2_bin_dict) # the bin data for the two EAS heads
 
@@ -187,49 +191,32 @@ for i in range(len_B_mag):
     # calculate angles between MAG vectors and EAS vectors:
     B_angle[i] = np.arccos(np.dot(vector_mag,vector_eas))*180/np.pi
 
-    # calculate EASX elevation and azimuth bins for EAS vectors:
-    head = 0
-    head, B_mag_EASXz_angle[0][i], B_mag_EASXz_angle[1][i] = fx.headPicker(vector_mag, EASXz_SRF[0], EASXz_SRF[1])
-    B_mag_head[i] = head
+    # calculate EASX elevation and azimuth bins for MAG vectors:
+    head_mag, B_mag_EASXz_angle[0][i], B_mag_EASXz_angle[1][i] = fx.headPicker(vector_mag, EASXz_SRF[0], EASXz_SRF[1])
+    B_mag_head[i] = head_mag
 
-    vector_mag_cart_EASX = SRFtoEASX[head].dot(vector_mag)
+    vector_mag_cart_EASX = SRFtoEASX[head_mag].dot(vector_mag)
     B_mag_cart_EASX[i] = vector_mag_cart_EASX
 
     vector_mag_sphe_EASX = fx.cartToSphere(vector_mag_cart_EASX)
     B_mag_sphe_EASX[i] = vector_mag_sphe_EASX
 
-    B_mag_elev_bin_parallel = fx.binFinder(vector_mag_sphe_EASX[1], bin_dictionary[head]['ELEVATION_lower_bound'], bin_dictionary[head]['ELEVATION_upper_bound'])
-    B_mag_elev_bin_antiparallel = fx.binFinder(-vector_mag_sphe_EASX[1], bin_dictionary[head]['ELEVATION_lower_bound'], bin_dictionary[head]['ELEVATION_upper_bound'])
-    B_mag_elev_bin[i] = np.array([B_mag_elev_bin_parallel, B_mag_elev_bin_antiparallel])
+    B_mag_elev_bin[i], B_mag_azim_bin[i], B_mag_elev_EASX[i], B_mag_azim_EASX[i] = fx.binFinder(vector_mag_sphe_EASX, head_mag, bin_dictionary)
 
-    B_mag_azim_bin_parallel = fx.binFinder(vector_mag_sphe_EASX[2], bin_dictionary[head]['AZIMUTH_lower_bound'], bin_dictionary[head]['AZIMUTH_upper_bound'])
-    B_mag_azim_bin_antiparallel = fx.binFinder((vector_mag_sphe_EASX[2] + 180) % 360, bin_dictionary[head]['AZIMUTH_lower_bound'], bin_dictionary[head]['AZIMUTH_upper_bound'])
-    B_mag_azim_bin[i] = np.array([B_mag_azim_bin_parallel, B_mag_azim_bin_antiparallel])
+    # calculate EASX elevation and azimuth bins for EAS vectors:
+    head_eas, B_eas_EASXz_angle[0][i], B_eas_EASXz_angle[1][i] = fx.headPicker(vector_eas, EASXz_SRF[0], EASXz_SRF[1])
+    B_eas_head[i] = head_eas
 
-    B_mag_elev_EASX[i] = np.array([bin_dictionary[head]['ELEVATION'][B_mag_elev_bin_parallel], bin_dictionary[head]['ELEVATION'][B_mag_elev_bin_antiparallel]])
-    B_mag_azim_EASX[i] = np.array([bin_dictionary[head]['AZIMUTH'][B_mag_azim_bin_parallel], bin_dictionary[head]['AZIMUTH'][B_mag_azim_bin_antiparallel]])
-
-    # calculate EASX elevation and azimuth bins for MAG vectors:
-    head = 0
-    head, B_eas_EASXz_angle[0][i], B_eas_EASXz_angle[1][i] = fx.headPicker(vector_eas, EASXz_SRF[0], EASXz_SRF[1])
-    B_eas_head[i] = head
-
-    vector_eas_cart_EASX = SRFtoEASX[head].dot(vector_eas)
+    vector_eas_cart_EASX = SRFtoEASX[head_eas].dot(vector_eas)
     B_eas_cart_EASX[i] = vector_eas_cart_EASX
 
     vector_eas_sphe_EASX = fx.cartToSphere(vector_eas_cart_EASX)
     B_eas_sphe_EASX[i] = vector_eas_sphe_EASX
 
-    B_eas_elev_bin_parallel = fx.binFinder(vector_eas_sphe_EASX[1], bin_dictionary[head]['ELEVATION_lower_bound'], bin_dictionary[head]['ELEVATION_upper_bound'])
-    B_eas_elev_bin_antiparallel = fx.binFinder(-vector_eas_sphe_EASX[1], bin_dictionary[head]['ELEVATION_lower_bound'], bin_dictionary[head]['ELEVATION_upper_bound'])
-    B_eas_elev_bin[i] = np.array([B_eas_elev_bin_parallel, B_eas_elev_bin_antiparallel])
+    B_eas_elev_bin[i], B_eas_azim_bin[i], B_eas_elev_EASX[i], B_eas_azim_EASX[i] = fx.binFinder(vector_eas_sphe_EASX, head_eas, bin_dictionary)
 
-    B_eas_azim_bin_parallel = fx.binFinder(vector_eas_sphe_EASX[2], bin_dictionary[head]['AZIMUTH_lower_bound'], bin_dictionary[head]['AZIMUTH_upper_bound'])
-    B_eas_azim_bin_antiparallel = fx.binFinder((vector_eas_sphe_EASX[2] + 180) % 360, bin_dictionary[head]['AZIMUTH_lower_bound'], bin_dictionary[head]['AZIMUTH_upper_bound'])
-    B_eas_azim_bin[i] = np.array([B_eas_azim_bin_parallel, B_eas_azim_bin_antiparallel])
-
-    B_eas_elev_EASX[i] = np.array([bin_dictionary[head]['ELEVATION'][B_eas_elev_bin_parallel], bin_dictionary[head]['ELEVATION'][B_eas_elev_bin_antiparallel]])
-    B_eas_azim_EASX[i] = np.array([bin_dictionary[head]['AZIMUTH'][B_eas_azim_bin_parallel], bin_dictionary[head]['AZIMUTH'][B_eas_azim_bin_antiparallel]])
+    # if (B_eas_elev_EASX[i][0] == -1.66) or (B_eas_elev_EASX[i][0] == -1.93):
+    #     print('\ngoteem')
 
     #print('{}, {}'.format(B_mag_elev_bin_parallel,B_mag_elev_bin_antiparallel))
     #print('{}, {}'.format(B_mag_azim_bin_parallel,B_mag_azim_bin_antiparallel))

@@ -145,7 +145,7 @@ def headPicker(vectorB,EAS1zAxis,EAS2zAxis):
     return head, EAS1z_angle, EAS2z_angle
 
 
-def binFinder(angle, binLowerBoundArray, binUpperBoundArray, dp=2):
+def binIndexFinder(angle, binLowerBoundArray, binUpperBoundArray, dp=2):
     # calculates the index of the bin that an angle falls into
     # angle = angle in degrees
     # binLowerBoundArray = array of lower bounds of bins
@@ -166,4 +166,27 @@ def binFinder(angle, binLowerBoundArray, binUpperBoundArray, dp=2):
     #     #    '''angle out of range!'''
     #     #    break
     # note: the "round" function behaves unusually, e.g. rounding 22.885 to 22.88 (see https://docs.python.org/2/library/functions.html#round). This should only affect elevation bin 12 (-22.885 vs -22.89), and the angle difference is minuscule anyway.
+
     return binIndex #(binIndex + 1) % len(binLowerBoundArray)
+
+
+def binFinder(vector_sphe, head, bin_dict):
+    # calculates the parallel and antiparallel elevation and azimuth bins in the EASX head frame for a B vector
+    # vector_sphe = B vector in spherical coordinates, in the EASX head frame
+    # head = the EASX head frame to use (i.e. the frame in which vector_sphe is measured)
+    # bin_dict = bin_dictionary, where all the bin data are stored
+
+    B_elev_bin_parallel = binIndexFinder(vector_sphe[1], bin_dict[head]['ELEVATION_lower_bound'], bin_dict[head]['ELEVATION_upper_bound'])
+    B_elev_bin_antiparallel = bin_dict[head]['ELEVATION_bin_count'] - 1 - B_elev_bin_parallel
+    #B_elev_bin_antiparallel = binIndexFinder(-vector_sphe_EASX[1], bin_dict[head]['ELEVATION_lower_bound'], bin_dict[head]['ELEVATION_upper_bound'])
+    B_elev_bin = np.array([B_elev_bin_parallel, B_elev_bin_antiparallel])
+
+    B_azim_bin_parallel = binIndexFinder(vector_sphe[2], bin_dict[head]['AZIMUTH_lower_bound'], bin_dict[head]['AZIMUTH_upper_bound'])
+    B_azim_bin_antiparallel = (B_azim_bin_parallel + int((bin_dict[head]['AZIMUTH_bin_count'] - 1)/2)) % (bin_dict[head]['AZIMUTH_bin_count'] - 1)
+    #B_azim_bin_antiparallel = binIndexFinder((vector_sphe_EASX[2] + 180) % 360, bin_dict[head]['AZIMUTH_lower_bound'], bin_dict[head]['AZIMUTH_upper_bound'])
+    B_azim_bin = np.array([B_azim_bin_parallel, B_azim_bin_antiparallel])
+
+    B_elev = np.array([bin_dict[head]['ELEVATION'][B_elev_bin_parallel], bin_dict[head]['ELEVATION'][B_elev_bin_antiparallel]])
+    B_azim = np.array([bin_dict[head]['AZIMUTH'][B_azim_bin_parallel], bin_dict[head]['AZIMUTH'][B_azim_bin_antiparallel]])
+    
+    return B_elev_bin, B_azim_bin, B_elev, B_azim
