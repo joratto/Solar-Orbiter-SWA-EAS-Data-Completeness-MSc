@@ -11,6 +11,7 @@ from spacepy import pycdf
 import datetime
 
 import functionsMSc as fx
+from useful_Matrices import *
 
 
 '''CDF configuration'''
@@ -33,93 +34,6 @@ tf_eas = time_eas[-1] # end of B EAS timeframe
 tf_mag = time_mag[-1] # end of B MAG timeframe
 print('EAS time series from {} to {}'.format(t0_eas, tf_eas))
 print('MAG time series from {} to {}'.format(t0_mag, tf_mag))
-
-
-'''useful matrices'''
-r2o2 = np.sqrt(2)/2 # root 2 over 2
-SRFtoEAS1 = np.array([[0,0,-1],[-r2o2,r2o2,0],[r2o2,r2o2,0]])
-SRFtoEAS2 = np.array([[0,0,1],[-r2o2,-r2o2,0],[r2o2,-r2o2,0]])
-SRFtoEASX = (SRFtoEAS1,SRFtoEAS2) # the transform matrices for SRF to the respective EAS head coordinates
-
-EAS1toSRF = np.array([[0,-r2o2,r2o2],[0,r2o2,r2o2],[-1,0,0]])
-EAS2toSRF = np.array([[0,-r2o2,r2o2],[0,-r2o2,-r2o2],[1,0,0]])
-EASXtoSRF = (EAS1toSRF,EAS2toSRF) # the inverse transform matrices
-
-EAS1z_SRF = EAS1toSRF.T[2] # the EASx z axis in the SRF frame is equivalent to the third column of EASxtoSRF
-EAS2z_SRF = EAS2toSRF.T[2]
-EASXz_SRF = (EAS1z_SRF, EAS2z_SRF)
-print('\nEAS1z SRF = {}\nEAS2z SRF = {}'.format(EAS1z_SRF, EAS2z_SRF))
-
-
-'''bin dictionaries'''
-EAS1_bin_dict = {'ELEVATION':np.array([39.34,  29.17,  20.91,  13.98,   8.06,   2.91,  -1.66,  -5.82,  -9.7, -13.43, -17.13, -20.94, -25., -29.53, -34.82, -41.36]),
-        'ELEVATION_delta_lower':np.array([5.66,  4.514, 3.748, 3.179, 2.74,  2.409, 2.161, 1.996, 1.886, 1.841, 1.856, 1.95, 2.115, 2.413, 2.88, 3.655]),
-        'ELEVATION_delta_upper':np.array([5.66,  4.514, 3.748, 3.179, 2.74,  2.409, 2.161, 1.996, 1.886, 1.841, 1.856, 1.95, 2.115, 2.413, 2.88, 3.655]),
-        'AZIMUTH':np.array([5.625,  16.875,  28.125,  39.375,  50.625,  61.875,  73.125,  84.375,  95.625, 106.875, 118.125, 129.375, 140.625, 151.875, 163.125, 174.375, 185.625, 196.875, 208.125, 219.375, 230.625, 241.875, 253.125, 264.375, 275.625, 286.875, 298.125, 309.375, 320.625, 331.875, 343.125, 354.375]),
-        'AZIMUTH_delta_lower':np.array([5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625]),
-        'AZIMUTH_delta_upper':np.array([5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625])}
-dictionary = EAS1_bin_dict
-dictionary['ELEVATION_lower_bound'] = dictionary['ELEVATION'] - dictionary['ELEVATION_delta_lower'] # subtract elevation bin lower deltas from elevation bin centers to get the lower bounds
-dictionary['AZIMUTH_lower_bound'] = dictionary['AZIMUTH'] - dictionary['AZIMUTH_delta_lower']
-dictionary['ELEVATION_upper_bound'] = dictionary['ELEVATION'] + dictionary['ELEVATION_delta_upper'] # add elevation bin upper deltas to elevation bin centers to get the upper bounds
-dictionary['AZIMUTH_upper_bound'] = dictionary['AZIMUTH'] + dictionary['AZIMUTH_delta_upper']
-dictionary['ELEVATION_bin_count'] = len(dictionary['ELEVATION'])
-dictionary['AZIMUTH_bin_count'] = len(dictionary['AZIMUTH'])
-
-EAS2_bin_dict = {'ELEVATION':np.array([38.94,  28.25,  19.86,  12.99,   7.25,   2.35,  -1.93,  -5.78,  -9.37, -12.84, -16.32, -19.97, -23.97, -28.57, -34.13, -41.1]),
-        'ELEVATION_delta_lower':np.array([6.06,  4.633, 3.761, 3.111, 2.624, 2.272, 2.012, 1.838, 1.747, 1.722, 1.759, 1.887, 2.113, 2.485, 3.071, 3.897]),
-        'ELEVATION_delta_upper':np.array([6.06,  4.633, 3.761, 3.111, 2.624, 2.272, 2.012, 1.838, 1.747, 1.722, 1.759, 1.887, 2.113, 2.485, 3.071, 3.897]),
-        'AZIMUTH':np.array([5.625,  16.875,  28.125,  39.375,  50.625,  61.875,  73.125,  84.375,  95.625, 106.875, 118.125, 129.375, 140.625, 151.875, 163.125, 174.375, 185.625, 196.875, 208.125, 219.375, 230.625, 241.875, 253.125, 264.375, 275.625, 286.875, 298.125, 309.375, 320.625, 331.875, 343.125, 354.375]),
-        'AZIMUTH_delta_lower':np.array([5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625]),
-        'AZIMUTH_delta_upper':np.array([5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625])}
-dictionary = EAS2_bin_dict
-dictionary['ELEVATION_lower_bound'] = dictionary['ELEVATION'] - dictionary['ELEVATION_delta_lower'] # subtract elevation bin lower deltas from elevation bin centers to get the lower bounds
-dictionary['AZIMUTH_lower_bound'] = dictionary['AZIMUTH'] - dictionary['AZIMUTH_delta_lower']
-dictionary['ELEVATION_upper_bound'] = dictionary['ELEVATION'] + dictionary['ELEVATION_delta_upper'] # add elevation bin upper deltas to elevation bin centers to get the upper bounds
-dictionary['AZIMUTH_upper_bound'] = dictionary['AZIMUTH'] + dictionary['AZIMUTH_delta_upper']
-dictionary['ELEVATION_bin_count'] = len(dictionary['ELEVATION'])
-dictionary['AZIMUTH_bin_count'] = len(dictionary['AZIMUTH'])
-
-bin_dictionary = (EAS1_bin_dict, EAS2_bin_dict) # the bin data for the two EAS heads
-
-
-EAS2_bin_dict_old = {'ELEVATION':np.array([ 39.044788,    28.411247,    19.576036,    11.764658,     5.0754714, -0.49025512,  -5.1967564,   -9.1976643,  -12.682464,   -15.899632,  -18.874838,   -21.873714,   -25.295139,   -29.432489,   -34.743786, -41.378841]),
-        'ELEVATION_delta_lower':np.array([5.9548,   4.6812,   4.156,    3.6547,   3.03547,  2.529745, 2.17324,  1.82234,  1.6575,   1.5604,   1.4152,   1.5863,   1.8449,   2.2975,   3.0162,   3.6212 ]),
-        'ELEVATION_delta_upper':np.array([5.9552,   4.6788,   4.154,    3.6553,   3.03453,  2.530255, 2.17676,  1.82766, 1.6625,   1.5596,   1.4148,   1.5837,   1.8351,   2.2925,   3.0138,   3.6188  ]),
-        'AZIMUTH':np.array([5.625,  16.875,  28.125,  39.375,  50.625,  61.875,  73.125,  84.375,  95.625, 106.875, 118.125, 129.375, 140.625, 151.875, 163.125, 174.375, 185.625, 196.875, 208.125, 219.375, 230.625, 241.875, 253.125, 264.375, 275.625, 286.875, 298.125, 309.375, 320.625, 331.875, 343.125, 354.375]),
-        'AZIMUTH_delta_lower':np.array([5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625]),
-        'AZIMUTH_delta_upper':np.array([5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625])}
-dictionary = EAS2_bin_dict_old
-dictionary['ELEVATION_lower_bound'] = dictionary['ELEVATION'] - dictionary['ELEVATION_delta_lower'] # subtract elevation bin lower deltas from elevation bin centers to get the lower bounds
-dictionary['AZIMUTH_lower_bound'] = dictionary['AZIMUTH'] - dictionary['AZIMUTH_delta_lower']
-dictionary['ELEVATION_upper_bound'] = dictionary['ELEVATION'] + dictionary['ELEVATION_delta_upper'] # add elevation bin upper deltas to elevation bin centers to get the upper bounds
-dictionary['AZIMUTH_upper_bound'] = dictionary['AZIMUTH'] + dictionary['AZIMUTH_delta_upper']
-dictionary['ELEVATION_bin_count'] = len(dictionary['ELEVATION'])
-dictionary['AZIMUTH_bin_count'] = len(dictionary['AZIMUTH'])
-
-EAS1_bin_dict_old = {'ELEVATION':np.array([ 39.530624,    29.387497,    20.671091,    13.129827,     6.478693, 0.60467362,  -4.5230989,   -8.9728432,  -12.822032,   -16.335674, -19.694551,   -22.974125,   -26.428017,   -30.432095,   -35.349419, -41.543976  ]),
-        'ELEVATION_delta_lower':np.array([5.4706,   4.6775,   4.0411,   3.4998,   3.14869,  2.724674, 2.4069,   2.04716, 1.808,    1.7043,   1.6554,   1.6259,   1.822,    2.1779,   2.7406,   3.456   ]),
-        'ELEVATION_delta_upper':np.array([5.4694,   4.6725,   4.0389,   3.5002,   3.15131,  2.725326, 2.4031,   2.04284, 1.802,    1.7057,   1.6546,   1.6241,   1.828,    2.1821,   2.7394,   3.454   ]),
-        'AZIMUTH':np.array([5.625,  16.875,  28.125,  39.375,  50.625,  61.875,  73.125,  84.375,  95.625, 106.875, 118.125, 129.375, 140.625, 151.875, 163.125, 174.375, 185.625, 196.875, 208.125, 219.375, 230.625, 241.875, 253.125, 264.375, 275.625, 286.875, 298.125, 309.375, 320.625, 331.875, 343.125, 354.375]),
-        'AZIMUTH_delta_lower':np.array([5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625]),
-        'AZIMUTH_delta_upper':np.array([5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625])}
-dictionary = EAS1_bin_dict_old
-dictionary['ELEVATION_lower_bound'] = dictionary['ELEVATION'] - dictionary['ELEVATION_delta_lower'] # subtract elevation bin lower deltas from elevation bin centers to get the lower bounds
-dictionary['AZIMUTH_lower_bound'] = dictionary['AZIMUTH'] - dictionary['AZIMUTH_delta_lower']
-dictionary['ELEVATION_upper_bound'] = dictionary['ELEVATION'] + dictionary['ELEVATION_delta_upper'] # add elevation bin upper deltas to elevation bin centers to get the upper bounds
-dictionary['AZIMUTH_upper_bound'] = dictionary['AZIMUTH'] + dictionary['AZIMUTH_delta_upper']
-dictionary['ELEVATION_bin_count'] = len(dictionary['ELEVATION'])
-dictionary['AZIMUTH_bin_count'] = len(dictionary['AZIMUTH'])
-
-old_bin_dictionary = (EAS1_bin_dict_old, EAS2_bin_dict_old)
-
-#print(EAS1_bin_dict['ELEVATION_lower_bound'])
-#print(EAS1_bin_dict['ELEVATION'])
-#print(EAS1_bin_dict['ELEVATION_upper_bound'])
-#print(EAS1_bin_dict['AZIMUTH_lower_bound'])
-#print(EAS1_bin_dict['AZIMUTH'])
-#print(EAS1_bin_dict['AZIMUTH_upper_bound'])
-#print('HOOOLD IIIIT')
 
 
 '''time series processing'''
@@ -218,6 +132,12 @@ B_mag_elev_bin = np.ndarray((len_B_mag,2))
 B_eas_elev_EASX = np.ndarray((len_B_eas,2))
 B_mag_elev_EASX = np.ndarray((len_B_mag,2))
 
+B_eas_elev_EASX_upper = np.ndarray((len_B_eas,2))
+B_mag_elev_EASX_upper = np.ndarray((len_B_mag,2))
+
+B_eas_elev_EASX_lower = np.ndarray((len_B_eas,2))
+B_mag_elev_EASX_lower = np.ndarray((len_B_mag,2))
+
 # calculated EAS azimuth bin index (parallel and antiparallel)
 B_eas_azim_bin = np.ndarray((len_B_eas,2))
 B_mag_azim_bin = np.ndarray((len_B_eas,2))
@@ -225,6 +145,12 @@ B_mag_azim_bin = np.ndarray((len_B_eas,2))
 # calculated EASX azimuth (parallel and antiparallel)
 B_eas_azim_EASX = np.ndarray((len_B_eas,2))
 B_mag_azim_EASX = np.ndarray((len_B_mag,2))
+
+B_eas_azim_EASX_upper = np.ndarray((len_B_eas,2))
+B_mag_azim_EASX_upper = np.ndarray((len_B_mag,2))
+
+B_eas_azim_EASX_lower = np.ndarray((len_B_eas,2))
+B_mag_azim_EASX_lower = np.ndarray((len_B_mag,2))
 
 print('\n')
 for i in range(0,len_B_eas):
@@ -271,7 +197,7 @@ for i in range(0,len_B_eas):
         vector_mag_sphe_EASX = fx.cartToSphere(vector_mag_cart_EASX)
         B_mag_sphe_EASX[i] = vector_mag_sphe_EASX
 
-        B_mag_elev_bin[i], B_mag_azim_bin[i], B_mag_elev_EASX[i], B_mag_azim_EASX[i] = fx.binFinder(vector_mag_sphe_EASX, head_mag, bin_dictionary)#old_bin_dictionary)
+        B_mag_elev_bin[i], B_mag_azim_bin[i], B_mag_elev_EASX[i], B_mag_azim_EASX[i] = fx.binFinder(vector_mag_sphe_EASX, head_mag, old_bin_dictionary)#old_bin_dictionary)
 
         # calculate EASX elevation and azimuth bins for EAS vectors:
         head_eas, B_eas_EASXz_angle[0][i], B_eas_EASXz_angle[1][i] = fx.headPicker(vector_eas, EASXz_SRF[0], EASXz_SRF[1])
@@ -284,7 +210,9 @@ for i in range(0,len_B_eas):
         B_eas_sphe_EASX[i] = vector_eas_sphe_EASX
 
         #B_eas_elev_bin[i], B_eas_azim_bin[i], B_eas_elev_EASX[i], B_eas_azim_EASX[i] = fx.binFinder(vector_eas_sphe_EASX, head_eas, bin_dictionary)#old_bin_dictionary)#B_eas_spherical_EASX[i], eas_used[i], bin_dictionary)#fx.binFinder(vector_eas_sphe_EASX, head_eas, bin_dictionary)#old_bin_dictionary)
-        B_eas_elev_bin[i], B_eas_azim_bin[i], B_eas_elev_EASX[i], B_eas_azim_EASX[i] = fx.binFinder(B_eas_spherical_EASX[i], eas_used[i], bin_dictionary)#old_bin_dictionary)#B_eas_spherical_EASX[i], eas_used[i], bin_dictionary)#fx.binFinder(vector_eas_sphe_EASX, head_eas, bin_dictionary)#old_bin_dictionary)
+        B_eas_elev_bin[i], B_eas_azim_bin[i], B_eas_elev_EASX[i], B_eas_azim_EASX[i] = fx.binFinder(B_eas_spherical_EASX[i], eas_used[i], old_bin_dictionary)#old_bin_dictionary)#B_eas_spherical_EASX[i], eas_used[i], bin_dictionary)#fx.binFinder(vector_eas_sphe_EASX, head_eas, bin_dictionary)#old_bin_dictionary)
+        temp1, temp2, B_eas_elev_EASX_upper[i], B_eas_azim_EASX_upper[i] = fx.binFinder_UpperBound(B_eas_spherical_EASX[i], eas_used[i], old_bin_dictionary)#old_bin_dictionary)
+        temp1, temp2, B_eas_elev_EASX_lower[i], B_eas_azim_EASX_lower[i] = fx.binFinder_LowerBound(B_eas_spherical_EASX[i], eas_used[i], old_bin_dictionary)#old_bin_dictionary)
 
         # if (B_eas_elev_EASX[i][0] == -1.66) or (B_eas_elev_EASX[i][0] == -1.93):
         #     print('\ngoteem')
@@ -303,6 +231,8 @@ B_eas_azim_bin_parallel, B_eas_azim_bin_antiparallel = B_eas_azim_bin.T # split 
 B_mag_azim_bin_parallel, B_mag_azim_bin_antiparallel = B_mag_azim_bin.T
 
 B_eas_elev_EASX_parallel, B_eas_elev_EASX_antiparallel = B_eas_elev_EASX.T # split calculated elevation values (parallel and antiparallel)
+B_eas_elev_EASX_upper_parallel, B_eas_elev_EASX_upper_antiparallel = B_eas_elev_EASX_upper.T
+B_eas_elev_EASX_lower_parallel, B_eas_elev_EASX_lower_antiparallel = B_eas_elev_EASX_lower.T
 B_mag_elev_EASX_parallel, B_mag_elev_EASX_antiparallel = B_mag_elev_EASX.T
 
 B_eas_azim_EASX_parallel, B_eas_azim_EASX_antiparallel = B_eas_azim_EASX.T # split calculated azimuth values (parallel and antiparallel)
@@ -338,7 +268,7 @@ geometry = 'spherical' # 'cartesian', 'spherical'
 coordinates = 'EASX' # 'SRF','EASX'
 print('plotting in {} coordinates with {} geometry'.format(coordinates,geometry))
 
-Nplots = 4 # number of plots to show
+Nplots = 3 # number of plots to show
 sns.set_theme(style='ticks')
 fig1, axs = plt.subplots(Nplots)
 
@@ -369,18 +299,18 @@ for i in range(len(corrBx)):
 
 
 '''plots'''
-# unit B_radius comparison
-ax = axs[0]
-ax.plot(time_mag,Bx_mag)
-ax.plot(time_eas,Bx_eas)
-#ax.plot(time_mag,Bx_mag_calc, color='blue')
-#ax.plot(time_eas,Bx_eas_calc, color='orange')
-ax.set_ylabel('B Amplitude'+'\n(unit {})'.format(coordinates))
-ax.legend([r"$B_{MAG}$", r"$B_{EAS}$"])#, r"$B_{MAG:Calc}$", r"$B_{EAS:Calc}$"])
-ax.set_ylim(-0.2,2.2)
-tick_spacing = 1
-ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
-ax.grid()
+# # unit B_radius comparison
+# ax = axs[0]
+# ax.plot(time_mag,Bx_mag)
+# ax.plot(time_eas,Bx_eas)
+# #ax.plot(time_mag,Bx_mag_calc, color='blue')
+# #ax.plot(time_eas,Bx_eas_calc, color='orange')
+# ax.set_ylabel('B Amplitude'+'\n(unit {})'.format(coordinates))
+# ax.legend([r"$B_{MAG}$", r"$B_{EAS}$"])#, r"$B_{MAG:Calc}$", r"$B_{EAS:Calc}$"])
+# ax.set_ylim(-0.2,2.2)
+# tick_spacing = 1
+# ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+# ax.grid()
 
 # # unit B_elevation comparison
 # ax = axs[1]
@@ -408,44 +338,84 @@ ax.grid()
 # ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
 # ax.grid()
 
-# # unit B_elevation comparison
-ax = axs[1]
-# ax.plot(time_mag,By_mag)
-ax.plot(time_eas,By_eas)
-ax.plot(time_eas,B_eas_elevation_used_parallel)
-ax.plot(time_eas,B_eas_elev_EASX_parallel, color='green')
+# # # unit B_elevation comparison
+# ax = axs[1]
+# # ax.plot(time_mag,By_mag)
+# #ax.plot(time_eas,By_eas)
+# ax.plot(time_eas,B_eas_elevation_used_parallel)
+# ax.plot(time_eas,B_eas_elev_EASX_parallel, color='green')
 # ax.plot(time_eas,B_eas_elevation_used_antiparallel)
-ax.plot(time_eas,B_eas_elev_EASX_antiparallel, color='purple')
+# ax.plot(time_eas,B_eas_elev_EASX_antiparallel, color='purple')
+# #ax.plot(time_eas,B_eas_elev_EASX_upper_parallel, color='gray')
+# #ax.plot(time_eas,B_eas_elev_EASX_lower_parallel, color='gray')
+# #ax.plot(time_mag,B_mag_elev_EASX_parallel)
+# #ax.plot(time_mag,B_mag_elev_EASX_antiparallel)
+# #ax.plot(time_mag,By_mag, color='blue')
+# #ax.plot(time_eas,By_eas, color='orange')
+# ax.set_ylabel('B Elevation'+'\n(degrees {})'.format(coordinates))
+# ax.legend([r"$B_{EAS:Used,↑↑}$", r"$B_{EAS:Calc,↑↑}$", r"$B_{EAS:Used,↑↓}$", r"$B_{EAS:Calc,↑↓}$"])#r"$B_{MAG,θ}$", r"$B_{EAS,θ}$", r"$B_{EAS:Used,θ↑↑}$", r"$B_{EAS:Calc,θ↑↑}$", r"$B_{EAS:Used,θ↑↓}$", r"$B_{EAS:Calc,θ↑↓}$"])#, r"$B_{EAS:Used,θ↑↓}$",r"$B_{EAS:Calc,θ↑↑}$",r"$B_{EAS:Calc,θ↑↓}$"])
+# ax.set_ylim(-55,55)
+# tick_spacing = 15 # degrees
+# ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+# ax.grid()
+
+# # unit B_azimuth comparison
+# ax = axs[2]
+# # ax.plot(time_mag,Bz_mag)
+# ax.plot(time_eas,Bz_eas)
+# ax.plot(time_eas,B_eas_azim_EASX_parallel, color='green')
+# ax.plot(time_eas,B_eas_azim_EASX_antiparallel, color='purple')
+# #ax.plot(time_mag,B_mag_azim_EASX_parallel)
+# #ax.plot(time_mag,B_mag_azim_EASX_antiparallel)
+# #ax.plot(time_mag,Bz_mag, color='blue')
+# #ax.plot(time_eas,Bz_eas, color='orange')
+# ax.set_ylabel('B Azimuth'+'\n(degrees {})'.format(coordinates))
+# ax.legend([r"$B_{EAS}$", r"$B_{EAS:Calc,↑↑}$", r"$B_{EAS:Calc,↑↓}$"])#, r"$B_{EAS:Calc,φ↑↓}$"])#r"$B_{MAG,φ}$", r"$B_{EAS,φ}$",r"$B_{EAS:Calc,φ↑↑}$",r"$B_{EAS:Calc,φ↑↓}$"])
+# ax.set_ylim(-15,375)
+# tick_spacing = 45 # degrees
+# ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+# ax.grid()
+
+# # unit B_elevation bin comparison
+ax = axs[0]
+# ax.plot(time_mag,By_mag)
+#ax.plot(time_eas,By_eas)
+ax.plot(time_eas,B_eas_elevation_bin_used_parallel)
+ax.plot(time_eas,B_eas_elev_bin_parallel, color='green')
+ax.plot(time_eas,B_eas_elevation_bin_used_antiparallel)
+ax.plot(time_eas,B_eas_elev_bin_antiparallel, color='purple')
+#ax.plot(time_eas,B_eas_elev_EASX_upper_parallel, color='gray')
+#ax.plot(time_eas,B_eas_elev_EASX_lower_parallel, color='gray')
 #ax.plot(time_mag,B_mag_elev_EASX_parallel)
 #ax.plot(time_mag,B_mag_elev_EASX_antiparallel)
 #ax.plot(time_mag,By_mag, color='blue')
 #ax.plot(time_eas,By_eas, color='orange')
-ax.set_ylabel('B Elevation'+'\n(degrees {})'.format(coordinates))
-ax.legend([r"$B_{EAS}$", r"$B_{EAS:Used,↑↑}$", r"$B_{EAS:Calc,↑↑}$", r"$B_{EAS:Calc,↑↓}$"])#r"$B_{MAG,θ}$", r"$B_{EAS,θ}$", r"$B_{EAS:Used,θ↑↑}$", r"$B_{EAS:Calc,θ↑↑}$", r"$B_{EAS:Used,θ↑↓}$", r"$B_{EAS:Calc,θ↑↓}$"])#, r"$B_{EAS:Used,θ↑↓}$",r"$B_{EAS:Calc,θ↑↑}$",r"$B_{EAS:Calc,θ↑↓}$"])
-ax.set_ylim(-55,55)
-tick_spacing = 15 # degrees
+ax.set_ylabel('B Elevation\nBin Index')
+ax.legend([r"$B_{EAS:Used,↑↑}$", r"$B_{EAS:Calc,↑↑}$", r"$B_{EAS:Used,↑↓}$", r"$B_{EAS:Calc,↑↓}$"])#r"$B_{MAG,θ}$", r"$B_{EAS,θ}$", r"$B_{EAS:Used,θ↑↑}$", r"$B_{EAS:Calc,θ↑↑}$", r"$B_{EAS:Used,θ↑↓}$", r"$B_{EAS:Calc,θ↑↓}$"])#, r"$B_{EAS:Used,θ↑↓}$",r"$B_{EAS:Calc,θ↑↑}$",r"$B_{EAS:Calc,θ↑↓}$"])
+ax.set_ylim(-1,16)
+tick_spacing = 1 # degrees
 ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
 ax.grid()
 
-# unit B_azimuth comparison
-ax = axs[2]
+# unit B_azimuth bin comparison
+ax = axs[1]
 # ax.plot(time_mag,Bz_mag)
-ax.plot(time_eas,Bz_eas)
-ax.plot(time_eas,B_eas_azim_EASX_parallel, color='green')
-ax.plot(time_eas,B_eas_azim_EASX_antiparallel, color='purple')
+#ax.plot(time_eas,Bz_eas)
+ax.plot(time_eas,B_eas_azim_bin_parallel, color='green')
+ax.plot(time_eas,B_eas_azim_bin_antiparallel, color='purple')
 #ax.plot(time_mag,B_mag_azim_EASX_parallel)
 #ax.plot(time_mag,B_mag_azim_EASX_antiparallel)
 #ax.plot(time_mag,Bz_mag, color='blue')
 #ax.plot(time_eas,Bz_eas, color='orange')
-ax.set_ylabel('B Azimuth'+'\n(degrees {})'.format(coordinates))
-ax.legend([r"$B_{EAS}$", r"$B_{EAS:Calc,↑↑}$", r"$B_{EAS:Calc,↑↓}$"])#, r"$B_{EAS:Calc,φ↑↓}$"])#r"$B_{MAG,φ}$", r"$B_{EAS,φ}$",r"$B_{EAS:Calc,φ↑↑}$",r"$B_{EAS:Calc,φ↑↓}$"])
-ax.set_ylim(-15,375)
-tick_spacing = 45 # degrees
+ax.set_ylabel('B Azimuth\nBin Index')
+ax.legend([r"$B_{EAS:Calc,↑↑}$", r"$B_{EAS:Calc,↑↓}$"])#, r"$B_{EAS:Calc,φ↑↓}$"])#r"$B_{MAG,φ}$", r"$B_{EAS,φ}$",r"$B_{EAS:Calc,φ↑↑}$",r"$B_{EAS:Calc,φ↑↓}$"])
+ax.set_ylim(-2,33)
+tick_spacing = 2 # bins
 ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
 ax.grid()
 
 # EAS sensor head used
-ax = axs[3]
+ax = axs[Nplots-1]
 ax.plot(time_eas,eas_used,color='green')
 #ax.plot(time_eas,B_eas_head,color='purple')
 #ax.plot(time_mag,B_mag_head,color='brown')

@@ -151,8 +151,8 @@ def cartToSphere(vector):
 
 def sphereToCart(vector):
     # input should be spherical, in degrees (R,theta,phi)
-    R, theta, phi = vector[0], vector[1]*np.pi/180, vector[2]*np.pi/180
-    vectorNew = astrocoo.SphericalRepresentation(R,theta,phi).represent_as(astrocoo.CartesianRepresentation)
+    R, theta, phi = vector[0], (vector[1]*np.pi/180)*astro.units.rad, (vector[2]*np.pi/180)*astro.units.rad
+    vectorNew = astrocoo.SphericalRepresentation(phi,theta,R).represent_as(astrocoo.CartesianRepresentation)
     x, y, z = vectorNew.x.value, vectorNew.y.value, vectorNew.z.value
     # output is cartesian
     return np.array([x,y,z])
@@ -254,3 +254,105 @@ def binFinder(vector_sphe, head, bin_dict):
     B_azim = np.array([bin_dict[head]['AZIMUTH'][B_azim_bin_parallel], bin_dict[head]['AZIMUTH'][B_azim_bin_antiparallel]])
     
     return B_elev_bin, B_azim_bin, B_elev, B_azim
+
+def binFinder_UpperBound(vector_sphe, head, bin_dict):
+    # calculates the parallel and antiparallel elevation and azimuth bins in the EASX head frame for a B vector
+    # vector_sphe = B vector in spherical coordinates, in the EASX head frame
+    # head = the EASX head frame to use (i.e. the frame in which vector_sphe is measured)
+    # bin_dict = bin_dictionary, where all the bin data are stored
+
+    B_elev_bin_parallel = binIndexFinder(vector_sphe[1], bin_dict[head]['ELEVATION_lower_bound'], bin_dict[head]['ELEVATION_upper_bound'], bin_dict[head]['ELEVATION'])
+    #B_elev_bin_antiparallel = bin_dict[head]['ELEVATION_bin_count'] - 1 - B_elev_bin_parallel
+    B_elev_bin_antiparallel = binIndexFinder(-vector_sphe[1], bin_dict[head]['ELEVATION_lower_bound'], bin_dict[head]['ELEVATION_upper_bound'], bin_dict[head]['ELEVATION'])
+    B_elev_bin = np.array([B_elev_bin_parallel, B_elev_bin_antiparallel])
+
+    B_azim_bin_parallel = binIndexFinder(vector_sphe[2], bin_dict[head]['AZIMUTH_lower_bound'], bin_dict[head]['AZIMUTH_upper_bound'], bin_dict[head]['AZIMUTH'])
+    #B_azim_bin_antiparallel = (B_azim_bin_parallel + int((bin_dict[head]['AZIMUTH_bin_count'] - 1)/2)) % (bin_dict[head]['AZIMUTH_bin_count'] - 1)
+    B_azim_bin_antiparallel = binIndexFinder((vector_sphe[2] + 180) % 360, bin_dict[head]['AZIMUTH_lower_bound'], bin_dict[head]['AZIMUTH_upper_bound'], bin_dict[head]['AZIMUTH'])
+    B_azim_bin = np.array([B_azim_bin_parallel, B_azim_bin_antiparallel])
+
+    B_elev = np.array([bin_dict[head]['ELEVATION_upper_bound'][B_elev_bin_parallel], bin_dict[head]['ELEVATION_upper_bound'][B_elev_bin_antiparallel]]) #+1*int(bin_dict[head]['ELEVATION'][B_elev_bin_parallel] >= 0)], bin_dict[head]['ELEVATION'][B_elev_bin_antiparallel]])
+    B_azim = np.array([bin_dict[head]['AZIMUTH_upper_bound'][B_azim_bin_parallel], bin_dict[head]['AZIMUTH_upper_bound'][B_azim_bin_antiparallel]])
+    
+    return B_elev_bin, B_azim_bin, B_elev, B_azim
+
+def binFinder_LowerBound(vector_sphe, head, bin_dict):
+    # calculates the parallel and antiparallel elevation and azimuth bins in the EASX head frame for a B vector
+    # vector_sphe = B vector in spherical coordinates, in the EASX head frame
+    # head = the EASX head frame to use (i.e. the frame in which vector_sphe is measured)
+    # bin_dict = bin_dictionary, where all the bin data are stored
+
+    B_elev_bin_parallel = binIndexFinder(vector_sphe[1], bin_dict[head]['ELEVATION_lower_bound'], bin_dict[head]['ELEVATION_upper_bound'], bin_dict[head]['ELEVATION'])
+    #B_elev_bin_antiparallel = bin_dict[head]['ELEVATION_bin_count'] - 1 - B_elev_bin_parallel
+    B_elev_bin_antiparallel = binIndexFinder(-vector_sphe[1], bin_dict[head]['ELEVATION_lower_bound'], bin_dict[head]['ELEVATION_upper_bound'], bin_dict[head]['ELEVATION'])
+    B_elev_bin = np.array([B_elev_bin_parallel, B_elev_bin_antiparallel])
+
+    B_azim_bin_parallel = binIndexFinder(vector_sphe[2], bin_dict[head]['AZIMUTH_lower_bound'], bin_dict[head]['AZIMUTH_upper_bound'], bin_dict[head]['AZIMUTH'])
+    #B_azim_bin_antiparallel = (B_azim_bin_parallel + int((bin_dict[head]['AZIMUTH_bin_count'] - 1)/2)) % (bin_dict[head]['AZIMUTH_bin_count'] - 1)
+    B_azim_bin_antiparallel = binIndexFinder((vector_sphe[2] + 180) % 360, bin_dict[head]['AZIMUTH_lower_bound'], bin_dict[head]['AZIMUTH_upper_bound'], bin_dict[head]['AZIMUTH'])
+    B_azim_bin = np.array([B_azim_bin_parallel, B_azim_bin_antiparallel])
+
+    B_elev = np.array([bin_dict[head]['ELEVATION_lower_bound'][B_elev_bin_parallel], bin_dict[head]['ELEVATION_lower_bound'][B_elev_bin_antiparallel]]) #+1*int(bin_dict[head]['ELEVATION'][B_elev_bin_parallel] >= 0)], bin_dict[head]['ELEVATION'][B_elev_bin_antiparallel]])
+    B_azim = np.array([bin_dict[head]['AZIMUTH_lower_bound'][B_azim_bin_parallel], bin_dict[head]['AZIMUTH_lower_bound'][B_azim_bin_antiparallel]])
+    
+    return B_elev_bin, B_azim_bin, B_elev, B_azim
+
+
+def getEASXBinProjections(head,bin_dict,cart_proj_tuple=(1,1),point_density=10):
+    # projects EASX bins from EASX spherical coordinates to other spherical coordinates
+    # head = the head in question (0 (EAS1) or 1 (EAS2))
+    # bin_dict = dictionary with all bin boundary data
+    # cart_proj_tuple = tuple with two cartesian coordinate transform matrices to desired projection. first for EAS1, second for EAS2.
+    # point_density = how many points to plot per degree
+
+    elevBinCount = bin_dict[head]['ELEVATION_bin_count']
+    azimBinCount = bin_dict[head]['AZIMUTH_bin_count']
+    
+    elevLowerBoundArray = bin_dict[head]['ELEVATION_lower_bound']
+    elevUpperBoundArray = bin_dict[head]['ELEVATION_upper_bound']
+    azimLowerBoundArray = bin_dict[head]['AZIMUTH_lower_bound']
+    azimUpperBoundArray = bin_dict[head]['AZIMUTH_upper_bound']
+
+    elevDeltaLowerArray = bin_dict[head]['ELEVATION_delta_lower']
+
+    azimuthPointCount = int(point_density*360/azimBinCount)
+    azimuthPointStep = 1/point_density
+
+    elevationPointStep = 1/point_density
+
+    #binBoundaryProjectionArray = np.ndarray((elevBinCount,azimBinCount)) # 2D array to store the projected points along the boundary of each bin
+    binBoundaryProjectionArray = []
+    print('\nprojection:')
+    for i in range(elevBinCount):
+        elevationBinWidth = 2*elevDeltaLowerArray[i]
+        elevationPointCount = int(point_density*elevationBinWidth)
+        binBoundaryProjectionArray.append([])
+        for j in range(azimBinCount):
+            pointArray = [] # array of points around a single elevzimuth bin/"pixel"
+            for k_az in range(0,azimuthPointCount):
+                lowerEdge_elev = np.array([1, elevLowerBoundArray[i], azimLowerBoundArray[j]+k_az*azimuthPointStep]) # vary azimuth along lower elevation
+                lowerEdge_elev = cartToSphere(cart_proj_tuple[head].dot(sphereToCart(lowerEdge_elev))) # EASX sphe -> EASX cart -> SRF cart -> SRF sphe
+                pointArray.append(lowerEdge_elev)
+
+                upperEdge_elev = np.array([1, elevUpperBoundArray[i], azimLowerBoundArray[j]+k_az*azimuthPointStep]) # vary azimuth along upper elevation
+                upperEdge_elev = cartToSphere(cart_proj_tuple[head].dot(sphereToCart(upperEdge_elev)))
+                pointArray.append(upperEdge_elev)
+
+            for k_el in range(0,elevationPointCount):
+                lowerEdge_azim = np.array([1, elevLowerBoundArray[i]+k_el*elevationPointStep, azimLowerBoundArray[j]]) # vary elevation along lower azimuth
+                lowerEdge_azim = cartToSphere(cart_proj_tuple[head].dot(sphereToCart(lowerEdge_azim)))
+                pointArray.append(lowerEdge_azim)
+
+                upperEdge_azim = np.array([1, elevLowerBoundArray[i]+k_el*elevationPointStep, azimUpperBoundArray[j]]) # vary elevation along upper azimuth
+                upperEdge_azim = cartToSphere(cart_proj_tuple[head].dot(sphereToCart(upperEdge_azim)))
+                pointArray.append(upperEdge_azim)
+
+            for point in pointArray:
+                point[2] = (point[2]) - 360*(point[2] > 180) # convert azimuth from [0,360) to (-180,180]
+            binBoundaryProjectionArray[i].append(np.array(pointArray).T)
+
+            print('\relevation = {}, azimuth = {}'.format(i, j), end='')
+    print('')
+
+    return binBoundaryProjectionArray
+
