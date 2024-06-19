@@ -20,12 +20,35 @@ Nplots = 1 # number of plots to show
 #sns.set_theme(style='darkgrid')
 fig, ax = plt.subplots(Nplots)
 
-point_density = 1
+point_density = 10
+
+# for headToProject in range(2):
+#         bin_bounds = fx.getEASXBinProjections(headToProject,bin_dictionary,EASXtoSRF,point_density=point_density)
+#         for i in range(len(bin_bounds)):
+#                 elev = bin_bounds[i]
+#                 foldername = 'bin_projections\EAS{}\el{}'.format(headToProject+1, i)
+#                 if not os.path.exists(foldername):
+#                         os.makedirs(foldername)
+#                 for j in range(len(elev)):
+#                         azim = elev[j]
+#                         ax.scatter(azim[2],azim[1],color='blue',marker='.',s=0.1)
+#                         filename = foldername + '\EAS{}_el{}_az{}.csv'.format(headToProject+1, i, j)
+#                         np.savetxt(filename, np.array(azim), delimiter=",")
+
+headToRead = 0
+print('\nreading bins:')
+for i in range(16):
+        for j in range(32):
+                filename = 'bin_projections\EAS{}\el{}\EAS{}_el{}_az{}.csv'.format(headToRead+1, i, headToRead+1, i, j)
+                pixelArray = np.genfromtxt(filename, delimiter=",")
+                pointCount = len(pixelArray)
+                el = pixelArray[1]
+                az = pixelArray[2]
+                ax.scatter(az,el,color='blue',marker='.',s=0.1)
+                print('\relevation = {}, azimuth = {}'.format(i, j), end='')
+print('')
+
 headToProject = 0
-bin_bounds = fx.getEASXBinProjections(headToProject,bin_dictionary,EASXtoSRF,point_density=point_density)
-for elev in bin_bounds:
-        for azim in elev:
-                ax.scatter(azim[2],azim[1],color='blue',marker='.',s=0.1)
 
 # headToProject = 1
 # bin_bounds = fx.getEASXBinProjections(headToProject,bin_dictionary,EASXtoSRF,point_density=1)
