@@ -196,7 +196,7 @@ def headPicker(vectorB,EAS1zAxis,EAS2zAxis):
     return head, EAS1z_angle, EAS2z_angle
 
 
-def binIndexFinder(angle, binLowerBoundArray, binUpperBoundArray, binArray, dp=0):
+def binIndexFinder(angle, binLowerBoundArray, binUpperBoundArray, binArray, dp=3):
     # calculates the index of the bin that an angle falls into
     # angle = angle in degrees
     # binLowerBoundArray = array of lower bounds of bins
@@ -234,26 +234,27 @@ def binIndexFinder(angle, binLowerBoundArray, binUpperBoundArray, binArray, dp=0
     return binIndex
 
 
-def binFinder(vector_sphe, head, bin_dict):
+def binFinder(vector_sphe, head, bin_dict, dp=3):
     # calculates the parallel and antiparallel elevation and azimuth bins in the EASX head frame for a B vector
     # vector_sphe = B vector in spherical coordinates, in the EASX head frame
     # head = the EASX head frame to use (i.e. the frame in which vector_sphe is measured)
     # bin_dict = bin_dictionary, where all the bin data are stored
 
-    B_elev_bin_parallel = binIndexFinder(vector_sphe[1], bin_dict[head]['ELEVATION_lower_bound'], bin_dict[head]['ELEVATION_upper_bound'], bin_dict[head]['ELEVATION'])
+    B_elev_bin_parallel = binIndexFinder(vector_sphe[1], bin_dict[head]['ELEVATION_lower_bound'], bin_dict[head]['ELEVATION_upper_bound'], bin_dict[head]['ELEVATION'], dp=dp)
     #B_elev_bin_antiparallel = bin_dict[head]['ELEVATION_bin_count'] - 1 - B_elev_bin_parallel
-    B_elev_bin_antiparallel = binIndexFinder(-vector_sphe[1], bin_dict[head]['ELEVATION_lower_bound'], bin_dict[head]['ELEVATION_upper_bound'], bin_dict[head]['ELEVATION'])
+    B_elev_bin_antiparallel = binIndexFinder(-vector_sphe[1], bin_dict[head]['ELEVATION_lower_bound'], bin_dict[head]['ELEVATION_upper_bound'], bin_dict[head]['ELEVATION'], dp=dp)
     B_elev_bin = np.array([B_elev_bin_parallel, B_elev_bin_antiparallel])
 
-    B_azim_bin_parallel = binIndexFinder(vector_sphe[2], bin_dict[head]['AZIMUTH_lower_bound'], bin_dict[head]['AZIMUTH_upper_bound'], bin_dict[head]['AZIMUTH'])
+    B_azim_bin_parallel = binIndexFinder(vector_sphe[2], bin_dict[head]['AZIMUTH_lower_bound'], bin_dict[head]['AZIMUTH_upper_bound'], bin_dict[head]['AZIMUTH'], dp=dp)
     #B_azim_bin_antiparallel = (B_azim_bin_parallel + int((bin_dict[head]['AZIMUTH_bin_count'] - 1)/2)) % (bin_dict[head]['AZIMUTH_bin_count'] - 1)
-    B_azim_bin_antiparallel = binIndexFinder((vector_sphe[2] + 180) % 360, bin_dict[head]['AZIMUTH_lower_bound'], bin_dict[head]['AZIMUTH_upper_bound'], bin_dict[head]['AZIMUTH'])
+    B_azim_bin_antiparallel = binIndexFinder((vector_sphe[2] + 180) % 360, bin_dict[head]['AZIMUTH_lower_bound'], bin_dict[head]['AZIMUTH_upper_bound'], bin_dict[head]['AZIMUTH'], dp=dp)
     B_azim_bin = np.array([B_azim_bin_parallel, B_azim_bin_antiparallel])
 
     B_elev = np.array([bin_dict[head]['ELEVATION'][B_elev_bin_parallel], bin_dict[head]['ELEVATION'][B_elev_bin_antiparallel]]) #+1*int(bin_dict[head]['ELEVATION'][B_elev_bin_parallel] >= 0)], bin_dict[head]['ELEVATION'][B_elev_bin_antiparallel]])
     B_azim = np.array([bin_dict[head]['AZIMUTH'][B_azim_bin_parallel], bin_dict[head]['AZIMUTH'][B_azim_bin_antiparallel]])
     
     return B_elev_bin, B_azim_bin, B_elev, B_azim
+
 
 def binFinder_UpperBound(vector_sphe, head, bin_dict):
     # calculates the parallel and antiparallel elevation and azimuth bins in the EASX head frame for a B vector
@@ -275,6 +276,7 @@ def binFinder_UpperBound(vector_sphe, head, bin_dict):
     B_azim = np.array([bin_dict[head]['AZIMUTH_upper_bound'][B_azim_bin_parallel], bin_dict[head]['AZIMUTH_upper_bound'][B_azim_bin_antiparallel]])
     
     return B_elev_bin, B_azim_bin, B_elev, B_azim
+
 
 def binFinder_LowerBound(vector_sphe, head, bin_dict):
     # calculates the parallel and antiparallel elevation and azimuth bins in the EASX head frame for a B vector
@@ -322,7 +324,7 @@ def getEASXBinProjections(head,bin_dict,cart_proj_tuple=(1,1),point_density=10):
 
     #binBoundaryProjectionArray = np.ndarray((elevBinCount,azimBinCount)) # 2D array to store the projected points along the boundary of each bin
     binBoundaryProjectionArray = []
-    print('\nprojection:')
+    print('\nbin projection:')
     for i in range(elevBinCount):
         elevationBinWidth = 2*elevDeltaLowerArray[i]
         elevationPointCount = int(point_density*elevationBinWidth)
@@ -356,3 +358,138 @@ def getEASXBinProjections(head,bin_dict,cart_proj_tuple=(1,1),point_density=10):
 
     return binBoundaryProjectionArray
 
+
+def getEASXVectorProjections(head,vector=np.array([0,0,0]),pitch_contours=[],cart_proj_tuple=(1,1),point_density=10):
+    # projects vector from EASX spherical coordinates to other spherical coordinates. Adapted from Chris Owen's algorithm.
+    # head = the head in question (0 (EAS1) or 1 (EAS2))
+    # vector = vector in EASX spherical coordinates
+    # pitch_contours = optional list of pitch angles in degrees for plotting a line of constant pitch angle relative to the vector
+    # cart_proj_tuple = tuple with two cartesian coordinate transform matrices to desired projection. first for EAS1, second for EAS2.
+    # point_density = how many points to plot per degree
+    
+    radius, el, az = vector[0], vector[1], vector[2]
+    
+    vector = cartToSphere(cart_proj_tuple[head].dot(sphereToCart(vector))) # EASX sphe -> EASX cart -> SRF cart -> SRF sphe
+    vector[2] = (vector[2]) - 360*(vector[2] > 180)
+
+    antivector = np.array([radius,-el,(az+180)%360])
+    antivector = cartToSphere(cart_proj_tuple[head].dot(sphereToCart(antivector)))
+    antivector[2] = (antivector[2]) - 360*(antivector[2] > 180)
+
+    theta, phi = vector[1]*np.pi/180, vector[2]*np.pi/180
+
+    # Let's use Chris's algorithm!
+    Mrot = np.array([[np.cos(phi)*np.cos(theta), np.sin(phi)*np.cos(theta), np.sin(theta)],
+                    [-np.sin(phi), np.cos(phi), 0],
+                    [-np.cos(phi)*np.sin(theta), -np.sin(phi)*np.sin(theta), np.cos(theta)]]) # transform matrix to the frame defined by the field vector
+    Mrot_inv = np.linalg.inv(Mrot)
+
+    contourArray = []
+    print('\nvector contour projection:')
+    for pitch in pitch_contours:
+        phaseCount = int(2*np.pi*abs(np.sin(pitch*np.pi/180))*90*point_density) # phasecount is given by a rough estimate of the "circumference" of the contour, in degrees
+        phaseArray = np.linspace(0,2*np.pi,phaseCount) # array of phase angles to go around the contour
+        pitch = pitch * np.pi/180
+        sinpitch = np.sin(pitch)
+        cospitch = np.cos(pitch)
+        for i in range(phaseCount):
+            phase = phaseArray[i]
+            conVec_cart = np.array([cospitch, sinpitch*np.cos(phase), sinpitch*np.sin(phase)])
+            conVec_cart_fieldframe = Mrot_inv.dot(conVec_cart)
+            conPhi = np.arctan2(conVec_cart_fieldframe[1],(conVec_cart_fieldframe[0]))*180/np.pi
+            conTheta = np.arctan2(conVec_cart_fieldframe[2],(np.sqrt(conVec_cart_fieldframe[0]**2+conVec_cart_fieldframe[1]**2)))*180/np.pi
+            contourArray.append(np.array([radius, conTheta, conPhi]))
+            print('\rpitch angle = {}, {:.0f}% complete'.format(int(pitch*180/np.pi), 100*i/phaseCount), end='')
+    print('')
+    
+    # contourArray = []
+    # print('\nvector contour projection:')
+    # for pitch in pitch_contours:
+    #     ampSin = np.sin(pitch*np.pi/180)
+    #     ampCos = np.cos(pitch*np.pi/180)
+    #     pointCount = 2*np.pi*pitch*point_density
+    #     pointCount = int(pointCount)
+    #     angleStep = 2*np.pi/pointCount
+    #     cosPitch = np.cos(pitch*np.pi/180)
+    #     sinPitch = np.sin(pitch*np.pi/180)
+    #     v = np.array(np.cos(pitch)/kx)
+    #     for i in range(pointCount):
+    #         el2 = i*angleStep
+    #         contourVector = np.array([radius, el + (np.sin(el2))*pitch, az + (np.cos(el2))*pitch])
+    #         contourVector[1] = (contourVector[1]) - 180*(contourVector[1] > 90) + 180*(contourVector[1] < -90) # keep elev between +/-90
+    #         contourVector = cartToSphere(cart_proj_tuple[head].dot(sphereToCart(contourVector)))
+    #         contourVector[1] = (contourVector[1]) - 90*(contourVector[1] > 90) + 90*(contourVector[1] < -90) # keep elev between +/-90
+    #         contourVector[2] = (contourVector[2]) - 360*(contourVector[2] > 180) # convert azimuth from [0,360) to (-180,180]
+    #         contourArray.append(contourVector)
+    #         print('\rpitch angle = {}, {:.0f}% complete'.format(pitch, 100*i/pointCount), end='')
+    # print('')
+
+    return vector, antivector, np.array(contourArray).T
+
+
+def getBinDictsFromBounds(EASXtop=[[],[]], EASXbot=[[],[]]):
+    # gets you a tuple of bin_dicts if you only have the top and bottom bounds of the bins for EASX, assuming azimuth bins are unchanged
+    # EASXtop = list of top bound arrays = (EAS1top,EAS2top)
+    # EASXbot = list of bottom bound arrays = (EAS1bot,EAS2bot)
+
+    dictionaries = [{},{}]
+
+    for i in range(2):
+        dictionary = {'ELEVATION':np.ndarray(16),
+        'ELEVATION_delta_lower':np.ndarray(16),
+        'ELEVATION_delta_upper':np.ndarray(16),
+        'AZIMUTH':np.array([5.625,  16.875,  28.125,  39.375,  50.625,  61.875,  73.125,  84.375,  95.625, 106.875, 118.125, 129.375, 140.625, 151.875, 163.125, 174.375, 185.625, 196.875, 208.125, 219.375, 230.625, 241.875, 253.125, 264.375, 275.625, 286.875, 298.125, 309.375, 320.625, 331.875, 343.125, 354.375]),
+        'AZIMUTH_delta_lower':np.array([5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625]),
+        'AZIMUTH_delta_upper':np.array([5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625])}
+
+        dictionary['ELEVATION_lower_bound'] = EASXbot[i]
+        dictionary['AZIMUTH_lower_bound'] = dictionary['AZIMUTH'] - dictionary['AZIMUTH_delta_lower']
+        dictionary['ELEVATION_upper_bound'] = EASXtop[i]
+        dictionary['AZIMUTH_upper_bound'] = dictionary['AZIMUTH'] + dictionary['AZIMUTH_delta_upper']
+        dictionary['ELEVATION_bin_count'] = len(dictionary['ELEVATION'])
+        dictionary['AZIMUTH_bin_count'] = len(dictionary['AZIMUTH'])
+
+        for j in range(len(dictionary['ELEVATION_delta_lower'])):
+                delta = (dictionary['ELEVATION_upper_bound'][j] - dictionary['ELEVATION_lower_bound'][j])/2
+                dictionary['ELEVATION_delta_lower'][j] = delta
+                dictionary['ELEVATION_delta_upper'][j] = delta
+                dictionary['ELEVATION'][j] = dictionary['ELEVATION_upper_bound'][j] + delta
+        
+        dictionaries[i] = dictionary
+
+    return (dictionaries[0],dictionaries[1])
+
+
+def getAngleLoss(head,bin_dict,B_mag=[[0,0,0],[0,0,0]],bin_indices=[0,0],dp=3):
+    # tells you which angles are lost due to a discrepancy between B_mag and the bin chosen by B_eas
+    # head = head used
+    # bin_dict = dictionary with binning data
+    # B_mag = pair for the parallel and antiparallel true ground vector in spherical coordinates in the head used by eas
+    # bin_indices = pair of indices for the parallel and antiparallel B_eas elevation bin chosen
+    
+    bin_indices = list(map(int, bin_indices))
+
+    losses = [0,0]
+    for i in range(2):
+        radius, el, az = B_mag[i][0], B_mag[i][1], B_mag[i][2]
+        binLowerBound = bin_dict[head]['ELEVATION_lower_bound'][bin_indices[i]]
+        binUpperBound = bin_dict[head]['ELEVATION_upper_bound'][bin_indices[i]]
+
+        # print('lower: ' + str(binLowerBound))
+        # print('el: ' + str(el))
+        # print('upper: ' + str(binUpperBound))
+
+        angleLoss = 0 
+        if not (binLowerBound <= el and el <= binUpperBound): # if B_mag is not inside the same elevation bin, then:
+            angle1 = abs(el - binLowerBound)
+            angle2 = abs(el - binUpperBound)
+            if angle1 < angle2: # what's the closest the vector reaches to the bin in terms of elevation?
+                angleLoss = angle1
+            else:
+                angleLoss = angle2
+        # else:
+        #     print('no loss!')
+
+        losses[i] = angleLoss
+
+    return losses
