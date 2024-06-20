@@ -493,3 +493,66 @@ def getAngleLoss(head,bin_dict,B_mag=[[0,0,0],[0,0,0]],bin_indices=[0,0],dp=3):
         losses[i] = angleLoss
 
     return losses
+
+
+def plotBinProjections(ax,headToRead,el_selected=[],az_selected=[],pix_selected=[],bin_color='b',el_color='r',az_color='g',pix_color='y',s=0.1):
+    # read and plot all projected bins in blue
+    # ax = axis to plot to
+    # headToRead = 0 for EAS1, 1 for EAS2
+    # el_selected = array of indices of elevation bins to highlight
+    # az_selected = array of indices of azimuth bins to highlight
+    # pix_selected = 2d array of index coordinates [el, az] of elevzimuth "pixels" to highlight
+    # s = point size
+    
+    # read and plot all bins in the selected head:
+    headToRead = 0
+    print('\nreading bins:')
+    for i in range(16):
+            for j in range(32):
+                    filename = 'bin_projections\EAS{}\el{}\EAS{}_el{}_az{}.csv'.format(headToRead+1, i, headToRead+1, i, j)
+                    pixelArray = np.genfromtxt(filename, delimiter=",")
+                    el = pixelArray[1]
+                    az = pixelArray[2]
+                    ax.scatter(az,el,color=bin_color,marker='.',s=s)
+                    print('\relevation = {}, azimuth = {}'.format(i, j), end='')
+    print('')
+
+    # read and plot the selected elevation bins:
+    for el in el_selected:
+        for j in range(32):
+                        filename = 'bin_projections\EAS{}\el{}\EAS{}_el{}_az{}.csv'.format(headToRead+1, el, headToRead+1, el, j)
+                        pixelArray = np.genfromtxt(filename, delimiter=",")
+                        el_plot = pixelArray[1]
+                        az_plot = pixelArray[2]
+                        ax.scatter(az_plot,el_plot,color=el_color,marker='.',s=s*1.5)
+
+    # read and plot the selected azimuth bins:
+    for az in az_selected:
+        for i in range(16):
+                        filename = 'bin_projections\EAS{}\el{}\EAS{}_el{}_az{}.csv'.format(headToRead+1, i, headToRead+1, i, az)
+                        pixelArray = np.genfromtxt(filename, delimiter=",")
+                        el_plot = pixelArray[1]
+                        az_plot = pixelArray[2]
+                        ax.scatter(az_plot,el_plot,color=az_color,marker='.',s=s*1.5)
+
+    # read and plot the selected elevzimuth pixels:
+    for pix in pix_selected:
+        el, az = pix[0], pix[1]
+        filename = 'bin_projections\EAS{}\el{}\EAS{}_el{}_az{}.csv'.format(headToRead+1, el, headToRead+1, el, az)
+        pixelArray = np.genfromtxt(filename, delimiter=",")
+        el_plot = pixelArray[1]
+        az_plot = pixelArray[2]
+        ax.scatter(az_plot,el_plot,color=pix_color,marker='.',s=s*1.5)
+
+
+def gifmaker(directory,gifname,duration=0.125,loop=0):
+    # generates a high quality gif given a directory where all your images (and only your images) are saved, and saves it in that same directory. The gif must be deleted externally before running this code again.
+    # directory = path to directory where images are saved
+    # gifname = what to name the gif
+    # duration = duration between each frame, in seconds
+    # loop = number of loops. 0 implies infinite loops.
+    
+    gif_path = directory + "\\" + gifname + ".gif"
+    frameslist = os.listdir(directory)
+    frames = np.stack([iio.imread(directory + f"\{framename}") for framename in frameslist], axis=0)
+    iio.imwrite(gif_path, frames, duration=duration, loop=loop)

@@ -15,8 +15,8 @@ from useful_Matrices import *
 
 
 '''CDF configuration'''
-cdf_filename_eas = 'solo_L1_swa-eas-padc_20231105T172733-20231105T174232_V01' + '.cdf' #'solo_L1_swa-eas-padc_20231105T172733-20231105T174232_V01'
-cdf_filename_mag = 'solo_L2_mag-srf-normal_20231105_V01' + '.cdf' #'solo_L2_mag-srf-normal_20231105_V01'
+cdf_filename_eas = 'solo_L1_swa-eas-padc_20230612T172734-20230612T173233_V01' + '.cdf' #'solo_L1_swa-eas-padc_20231105T172733-20231105T174232_V01'
+cdf_filename_mag = 'solo_L2_mag-srf-normal_20230612_V01' + '.cdf' #'solo_L2_mag-srf-normal_20231105_V01'
 
 
 '''CDF preparation'''
@@ -73,6 +73,7 @@ eas_series_crop_array = [B_eas,
 t0, tf = fx.getFilenameDatetime_EAS(cdf_filename_eas)
 print('final time series from {} to {}'.format(t0, tf))
 mag_series_crop_array, time_mag = fx.cropTimeToRef(mag_series_crop_array, time_mag, t0, tf)# + datetime.timedelta(microseconds=87500))
+mag_series_crop_array, time_mag = mag_series_crop_array[:], time_mag[:]
 eas_series_crop_array, time_eas = fx.cropTimeToRef(eas_series_crop_array, time_eas, t0, tf)# + datetime.timedelta(microseconds=87500))
 
 B_mag = mag_series_crop_array[0]
@@ -86,6 +87,26 @@ B_eas_elevation_used_antiparallel = eas_series_crop_array[5]
 len_B_eas = len(B_eas)
 len_B_mag = len(B_mag)
 print('\nB_eas vector count = {}\nB_mag vector count = {}'.format(len_B_eas, len_B_mag))
+
+if len_B_eas > len_B_mag:
+        B_eas = eas_series_crop_array[0][:len_B_mag]
+        eas_used = eas_series_crop_array[1][:len_B_mag]
+        B_eas_elevation_bin_used_parallel = eas_series_crop_array[2][:len_B_mag]
+        B_eas_elevation_bin_used_antiparallel = eas_series_crop_array[3][:len_B_mag]
+        B_eas_elevation_used_parallel = eas_series_crop_array[4][:len_B_mag]
+        B_eas_elevation_used_antiparallel = eas_series_crop_array[5][:len_B_mag]
+        time_eas = time_eas[:len_B_mag]
+
+        len_B_eas = len(B_eas)
+        len_B_mag = len(B_mag)
+        print('\nadj. B_eas vector count = {}\nadj. B_mag vector count = {}'.format(len_B_eas, len_B_mag))
+elif len_B_mag > len_B_eas:
+        B_mag = mag_series_crop_array[0][:len_B_eas]
+        time_mag = time_mag[:len_B_eas]
+
+        len_B_eas = len(B_eas)
+        len_B_mag = len(B_mag)
+        print('\nadj. B_eas vector count = {}\nadj. B_mag vector count = {}'.format(len_B_eas, len_B_mag))
 
 # magnitude
 B_eas_magnitude = np.ndarray((len_B_eas)) # (SRF)
@@ -207,8 +228,8 @@ for i in range(0,len_B_eas):
         vector_eas_sphe_EASX = fx.cartToSphere(vector_eas_cart_EASX)
         B_eas_sphe_EASX[i] = vector_eas_sphe_EASX
 
-        B_eas_elev_bin[i], B_eas_azim_bin[i], B_eas_elev_EASX[i], B_eas_azim_EASX[i] = fx.binFinder(vector_eas_sphe_EASX, head_eas, bin_dictionary)#old_bin_dictionary)#B_eas_spherical_EASX[i], eas_used[i], bin_dictionary)#fx.binFinder(vector_eas_sphe_EASX, head_eas, bin_dictionary)#old_bin_dictionary)
-        #B_eas_elev_bin[i], B_eas_azim_bin[i], B_eas_elev_EASX[i], B_eas_azim_EASX[i] = fx.binFinder(B_eas_spherical_EASX[i], eas_used[i], bin_dictionary)#B_eas_spherical_EASX[i], eas_used[i], bin_dictionary)#fx.binFinder(vector_eas_sphe_EASX, head_eas, bin_dictionary)#old_bin_dictionary)
+        #B_eas_elev_bin[i], B_eas_azim_bin[i], B_eas_elev_EASX[i], B_eas_azim_EASX[i] = fx.binFinder(vector_eas_sphe_EASX, head_eas, bin_dictionary)#old_bin_dictionary)#B_eas_spherical_EASX[i], eas_used[i], bin_dictionary)#fx.binFinder(vector_eas_sphe_EASX, head_eas, bin_dictionary)#old_bin_dictionary)
+        B_eas_elev_bin[i], B_eas_azim_bin[i], B_eas_elev_EASX[i], B_eas_azim_EASX[i] = fx.binFinder(B_eas_spherical_EASX[i], eas_used[i], bin_dictionary)#B_eas_spherical_EASX[i], eas_used[i], bin_dictionary)#fx.binFinder(vector_eas_sphe_EASX, head_eas, bin_dictionary)#old_bin_dictionary)
         temp1, temp2, B_eas_elev_EASX_upper[i], B_eas_azim_EASX_upper[i] = fx.binFinder_UpperBound(B_eas_spherical_EASX[i], eas_used[i], bin_dictionary)
         temp1, temp2, B_eas_elev_EASX_lower[i], B_eas_azim_EASX_lower[i] = fx.binFinder_LowerBound(B_eas_spherical_EASX[i], eas_used[i], bin_dictionary)
 
@@ -216,6 +237,7 @@ for i in range(0,len_B_eas):
         head_mag, B_mag_EASXz_angle[0][i], B_mag_EASXz_angle[1][i] = fx.headPicker(vector_mag, EASXz_SRF[0], EASXz_SRF[1])
         #B_mag_head[i] = head_mag
         B_mag_head[i] = head_eas
+        #B_mag_head[i] = eas_used[i]
         
         vector_mag_cart_EASX = SRFtoEASX[head_mag].dot(vector_mag)
         B_mag_cart_EASX[i] = vector_mag_cart_EASX
@@ -227,9 +249,11 @@ for i in range(0,len_B_eas):
 
         # calculate EAS pitch angle loss (parallel and antiparallel)
         comparison_vector_cart_EASX_para = SRFtoEASX[head_eas].dot(vector_mag)
+        # comparison_vector_cart_EASX_para = SRFtoEASX[eas_used[i]].dot(vector_mag)
         comparison_vector_sphe_EASX_para = fx.cartToSphere(comparison_vector_cart_EASX_para)
         comparison_vector_sphe_EASX_anti = np.array([comparison_vector_sphe_EASX_para[0], -comparison_vector_sphe_EASX_para[1], (comparison_vector_sphe_EASX_para[2] + 180) % 360])
         pitch_angle_loss[i] = fx.getAngleLoss(head_eas,bin_dictionary,B_mag=[comparison_vector_sphe_EASX_para, comparison_vector_sphe_EASX_anti],bin_indices=B_eas_elev_bin[i])
+        # pitch_angle_loss[i] = fx.getAngleLoss(head_eas,bin_dictionary,B_mag=[comparison_vector_sphe_EASX_para, comparison_vector_sphe_EASX_anti],bin_indices=np.array([B_eas_elevation_bin_used_parallel[i],B_eas_elevation_bin_used_antiparallel[i]]))
         pitch_angle_loss_total[i] = pitch_angle_loss[i][0] + pitch_angle_loss[i][1]
         pad_completeness[i] = (180 - pitch_angle_loss_total[i])/180
         # print(pitch_angle_loss[i])
@@ -288,7 +312,7 @@ fig1, axs = plt.subplots(Nplots)
 
 axs[0].set_title('{}    &    {}'.format(cdf_filename_eas, cdf_filename_mag))
 
-axs[0].set_title('Latest from SOAr\n{}    &    {}'.format(cdf_filename_eas, cdf_filename_mag))
+# axs[0].set_title('Latest from SOAr\n{}    &    {}'.format(cdf_filename_eas, cdf_filename_mag))
 
 '''coordinates dictionary'''
 # coordinates_dictionary = {'SRF':{'cartesian':(B_mag,B_eas),'spherical':(B_mag_spherical_SRF,B_eas_spherical_SRF)}, 
@@ -437,7 +461,7 @@ ax.grid()
 
 # pad completeness
 ax = axs[2]
-ax.plot(time_eas,pad_completeness*100, color='green')
+ax.plot(time_eas,(pad_completeness*100)[:len(time_eas)], color='green')
 ax.set_ylabel('PAD Completeness\n(%)')
 ax.set_ylim(-9,109)
 tick_spacing = 10 # %
@@ -551,3 +575,111 @@ plt.show(block=True) # set to block=False to automatically close figure
 ax = axs[0]
 
 plt.show()
+
+
+'''animation'''
+
+# define start/stop time indices
+anim_start = 840 #20230101 = 2840 #20230612 = 840 #20231105 = 1400
+anim_stop = 920 #20230101 = 2920 #20230612 = 920 #20231105 = 1480
+frames = anim_stop - anim_start
+time = time_eas[anim_start]
+time_start_str = '{:04d}{:02d}{:02d}h{:02d}m{:02d}s{:02d}μ{:06d}'.format(time.year,time.month,time.day,time.hour,time.minute,time.second,time.microsecond)
+time = time_eas[anim_stop]
+time_stop_str = '{:04d}{:02d}{:02d}h{:02d}m{:02d}s{:02d}μ{:06d}'.format(time.year,time.month,time.day,time.hour,time.minute,time.second,time.microsecond)
+foldername = '{}_to_{}'.format(time_start_str,time_stop_str) + '_justEAS_fullcontours'
+if not os.path.exists('animations\{}'.format(foldername)):
+        os.makedirs('animations\{}'.format(foldername))
+print(foldername)
+for t in range(anim_start,anim_stop):
+        print('\nframe {}/{}:'.format(t-anim_start+1,frames))
+        plt.clf()
+        Nplots = 1 # number of plots to show
+        #sns.set_theme(style='darkgrid')
+        fig, ax = plt.subplots(Nplots,figsize=(16,18))
+        #sns.set_theme(style='dark')
+        #plt.style.use("dark_background")
+
+        point_density = 10
+        # read and plot all projected bins in blue, selected elevation bins in red, and selected azimuth bins in green
+        headToRead = B_eas_head[t]
+        #headToRead = 0
+        headToProject = headToRead
+
+        eas_color = 'green'
+        mag_color = 'purple'
+        s=2
+
+        el_selected = [int(B_eas_elev_bin_parallel[t]), int(B_eas_elev_bin_antiparallel[t])]
+        az_selected = []#[2,9]
+        pix_selected = [[int(B_eas_elev_bin_parallel[t]),int(B_eas_azim_bin_parallel[t])], [int(B_eas_elev_bin_antiparallel[t]),int(B_eas_azim_bin_antiparallel[t])]]
+        fx.plotBinProjections(ax,headToRead,el_selected,az_selected,pix_selected,pix_color='g',s=s)
+
+        # el_selected = [int(B_eas_elevation_bin_used_parallel[t]), int(B_eas_elevation_bin_used_antiparallel[t])]
+        # az_selected = []#[2,9]
+        # pix_selected = [[int(B_eas_elevation_bin_used_parallel[t]),int(B_eas_azim_bin_parallel[t])], [int(B_eas_elevation_bin_used_antiparallel[t]),int(B_eas_azim_bin_antiparallel[t])]]
+        # fx.plotBinProjections(ax,headToRead,el_selected,az_selected,pix_selected,pix_color='g',s=s)
+
+        vectorEAS = np.array([Bx_eas[t], By_eas[t], Bz_eas[t]])
+        vectorEAS[2] = (vectorEAS[2]) - 360*(vectorEAS[2] > 180)
+        # vectorMAG = np.array([Bx_mag[t], By_mag[t], Bz_mag[t]])
+        # vectorMAG[2] = (vectorMAG[2]) - 360*(vectorMAG[2] > 180)
+
+        # vectorMag_loss = vectorMAG
+
+        pitch_contours = [30,45,60,90,120,135,150]
+        vectorEAS, antivectorEAS, contourArrayEAS = fx.getEASXVectorProjections(headToProject,vector=vectorEAS,pitch_contours=pitch_contours,cart_proj_tuple=EASXtoSRF,point_density=point_density)
+        # vectorMAG, antivectorMAG, contourArrayMAG = fx.getEASXVectorProjections(headToProject,vector=vectorMAG,pitch_contours=pitch_contours,cart_proj_tuple=EASXtoSRF,point_density=point_density)
+
+        contourRadiusEAS, contourElevEAS, contourAzimEAS = contourArrayEAS
+        # contourRadiusMAG, contourElevMAG, contourAzimMAG = contourArrayMAG
+
+        ax.scatter(contourAzimEAS,contourElevEAS,color=eas_color,marker='.',s=s)
+        # ax.scatter(contourAzimMAG,contourElevMAG,color=mag_color,marker='.',s=s)
+
+        # if (pitch_angle_loss[t][0] != 0) or (pitch_angle_loss[t][1] != 0):
+        #         loss_contours = []
+        #         print('\npitch angle loss = {}'.format(pitch_angle_loss[t]))
+        #         if pitch_angle_loss[t][0] != 0:
+        #                 loss_contours.append(pitch_angle_loss[t][0])
+        #         if pitch_angle_loss[t][1] != 0:
+        #                 loss_contours.append(180-pitch_angle_loss[t][1])
+        #         vectorMAG_loss, antivectorMAG_loss, contourArrayMAG_loss = fx.getEASXVectorProjections(headToProject,vector=vectorMag_loss,pitch_contours=loss_contours,cart_proj_tuple=EASXtoSRF,point_density=point_density)
+
+        #         contourRadiusMAG_loss, contourElevMAG_loss, contourAzimMAG_loss = contourArrayMAG_loss
+        #         ax.scatter(contourAzimMAG_loss,contourElevMAG_loss,color='r',marker='.',s=s)
+
+        # shaped markers
+        markersize = 15
+        ax.plot(vectorEAS[2],vectorEAS[1],markerfacecolor='none',markeredgecolor=eas_color,marker='D',markeredgewidth=2,markersize=markersize)
+        ax.plot(antivectorEAS[2],antivectorEAS[1],markerfacecolor='none',markeredgecolor=eas_color,marker='s',markeredgewidth=2,markersize=markersize)
+        # ax.plot(vectorMAG[2],vectorMAG[1],markerfacecolor='none',markeredgecolor=mag_color,marker='D',markeredgewidth=2,markersize=markersize)
+        # ax.plot(antivectorMAG[2],antivectorMAG[1],markerfacecolor='none',markeredgecolor=mag_color,marker='s',markeredgewidth=2,markersize=markersize)
+
+        # point markers
+        pointsize = 2
+        ax.plot(vectorEAS[2],vectorEAS[1],color=eas_color,marker='.',markeredgewidth=2,markersize=pointsize)
+        ax.plot(antivectorEAS[2],antivectorEAS[1],color=eas_color,marker='.',markeredgewidth=2,markersize=pointsize)
+        # ax.plot(vectorMAG[2],vectorMAG[1],color=mag_color,marker='.',markeredgewidth=2,markersize=pointsize)
+        # ax.plot(antivectorMAG[2],antivectorMAG[1],color=mag_color,marker='.',markeredgewidth=2,markersize=pointsize)
+
+        ax.set_ylim(-90,90)
+        ax.set_xlim(-180,180)
+        elev_tick_spacing = 15 # degrees
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(elev_tick_spacing))
+        azim_tick_spacing = 30 # degrees
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(azim_tick_spacing))
+        ax.set_ylabel('Elevation (degrees SRF)')
+        ax.set_xlabel('Azimuth (degrees SRF)')
+        ax.set_aspect(1)
+
+        time = time_eas[t]
+
+        titletime = '{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}.{}'.format(time.year,time.month,time.day,time.hour,time.minute,time.second,int(str(time.microsecond)[:4]))
+        ax.set_title('EAS{}, {}'.format(headToProject+1, titletime))
+
+        figname = '{:04d}{:02d}{:02d}h{:02d}m{:02d}s{:02d}μ{:06d}'.format(time.year,time.month,time.day,time.hour,time.minute,time.second,time.microsecond)
+        plt.savefig('animations\{}\{}'.format(foldername,figname))
+
+
+#plt.show()
