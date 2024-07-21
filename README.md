@@ -1,4 +1,4 @@
-# Joaquim-MSc
+# A UCL Space Science Engineering MSc project.
 Determining the accuracy and completeness of Burst Mode data collection from the Solar Orbiter SWA electron sensor.
 
 To use spacepy.pycdf, you must first install the NASA CDF C library from https://cdf.gsfc.nasa.gov/html/sw_and_docs.html
